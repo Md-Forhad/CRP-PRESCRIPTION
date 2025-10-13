@@ -1,0 +1,743 @@
+DECLARE
+    P_ONLINE_FLAG NUMBER;
+    P_DOC_CODE VARCHAR2(20);
+    P_CENTER_API VARCHAR2(500);
+    P_COUNT NUMBER;
+    P_ONLINE_COUNT NUMBER;
+    P_USER_AVAIL_COUNT NUMBER;
+    P_USER_AVAILABILTY NUMBER;
+    P_EFF_DATE VARCHAR2(100);
+    P_DOC_STATUS VARCHAR2(50);
+    DOC_LIST   SYS_REFCURSOR;
+
+    P_ADMIN_COUNT NUMBER;
+    P_USR_ID NUMBER;
+    ADMIN_LIST   SYS_REFCURSOR;
+
+BEGIN
+
+    :is_available := '0';
+    :is_online := 'false';
+    :p_doc_code := 'false';
+    :p_center_api := 'false';
+    :p_admin_user_id := 'false';
+    :p_admin_user_flag := 'false';
+    :p_center_name := 'CRP - MIRPUR';
+
+    SELECT COUNT(*) INTO P_COUNT
+    FROM DOCTOR_INFO DDM 
+    WHERE (DDM.DOC_PHONE = :doc_code OR DDM.DOC_CELL = :doc_code)
+    AND DDM.DOC_PASSWORD = :doc_password;
+
+    IF P_COUNT = 1 THEN
+
+        SELECT NVL(DDM.DOC_ONLINE_FLAG,0), DDM.DOC_CODE INTO P_ONLINE_FLAG, P_DOC_CODE
+        FROM DOCTOR_INFO DDM 
+        WHERE (DDM.DOC_PHONE = :doc_code OR DDM.DOC_CELL = :doc_code)
+        AND DDM.DOC_PASSWORD = :doc_password;
+
+        SELECT LIC_API_URL INTO P_CENTER_API FROM ISP_RUNAUTO;
+
+        IF P_ONLINE_FLAG = 1 THEN 
+
+            SELECT (CASE WHEN NVL(UPPER(DOC_STATUS), 'NEW') = 'QUIT' AND DOC_EFF_DATE <= SYSDATE THEN 0
+                    WHEN NVL(UPPER(DOC_STATUS), 'NEW') = 'QUIT' AND DOC_EFF_DATE > SYSDATE THEN 1
+                    WHEN NVL(UPPER(DOC_STATUS), 'NEW') <> 'QUIT' AND DOC_EFF_DATE <= SYSDATE THEN 1
+                    WHEN NVL(UPPER(DOC_STATUS), 'NEW') <> 'QUIT' AND DOC_EFF_DATE > SYSDATE THEN 0
+                    WHEN NVL(UPPER(DOC_STATUS), 'NEW') = 'TRANSFER' AND DOC_EFF_DATE > SYSDATE THEN 1
+                    WHEN NVL(UPPER(DOC_STATUS), 'NEW') = 'TRANSFER' AND DOC_EFF_DATE <= SYSDATE THEN 0
+                    ELSE 1 END) user_avail, TO_CHAR(DOC_EFF_DATE,'dd-MON-yy') DOC_EFF_DATE, DOC_STATUS  
+            INTO P_USER_AVAILABILTY,P_EFF_DATE,P_DOC_STATUS
+            FROM DOCTOR_INFO
+            WHERE DOC_CODE = P_DOC_CODE;
+
+            IF P_USER_AVAILABILTY = 1 THEN
+
+                SELECT COUNT(*) INTO P_ADMIN_COUNT
+                FROM ISP_USER
+                WHERE USR_CONTACT = :doc_code
+                AND USR_PASSWORD = ENCRYPT_PW_DB(:doc_password)
+                AND NVL(USR_QUIT,1) <> 1;
+
+                IF P_ADMIN_COUNT > 0 THEN
+
+                    OPEN ADMIN_LIST FOR
+                    SELECT USR_ID, USR_NAME, USR_FNAME, USR_LNAME
+                    FROM ISP_USER
+                    WHERE USR_CONTACT = :doc_code
+                    AND USR_PASSWORD = ENCRYPT_PW_DB(:doc_password)
+                    AND NVL(USR_QUIT,1) <> 1;
+
+                    OPEN DOC_LIST FOR
+                    SELECT DOC_VAIL.DOC_CODE,DOC_VAIL.DOC_NAME, DEPARTMENT_SLV.DEPTS_NAME
+                    FROM DOCTOR_INFO DDM, (SELECT (CASE WHEN NVL(UPPER(DOC_STATUS), 'NEW') = 'QUIT' AND DOC_EFF_DATE <= SYSDATE THEN 0
+                                            WHEN NVL(UPPER(DOC_STATUS), 'NEW') = 'QUIT' AND DOC_EFF_DATE > SYSDATE THEN 1
+                                            WHEN NVL(UPPER(DOC_STATUS), 'NEW') <> 'QUIT' AND DOC_EFF_DATE <= SYSDATE THEN 1
+                                            WHEN NVL(UPPER(DOC_STATUS), 'NEW') <> 'QUIT' AND DOC_EFF_DATE > SYSDATE THEN 0
+                                            WHEN NVL(UPPER(DOC_STATUS), 'NEW') = 'TRANSFER' AND DOC_EFF_DATE > SYSDATE THEN 1
+                                            WHEN NVL(UPPER(DOC_STATUS), 'NEW') = 'TRANSFER' AND DOC_EFF_DATE <= SYSDATE THEN 0
+                                            ELSE 1 END) user_avail, DOC_CODE, DOC_NAME
+                                    FROM DOCTOR_INFO) DOC_VAIL, DEPARTMENT_SLV
+                    WHERE (DDM.DOC_PHONE = :doc_code OR DDM.DOC_CELL = :doc_code)
+                    AND DDM.DOC_PASSWORD = :doc_password
+                    AND DOC_VAIL.DOC_CODE = DDM.DOC_CODE
+                    AND DEPARTMENT_SLV.DEPTS_ID = DDM.DOC_DEPTS_ID
+                    AND NVL(DDM.DOC_ONLINE_FLAG,0) = 1
+                    AND DOC_VAIL.user_avail = 1;
+
+                    :is_available := '5';
+                    :is_online := 'Multiple User and Admin found for your Login Credentials. Please contact with System Administrator.';
+                    :p_doc_code := 'false';
+                    :p_center_api := P_CENTER_API;
+                    :p_doc_list := DOC_LIST;
+                    :p_admin_list := ADMIN_LIST;
+                    :p_admin_user_id := 'false';
+                    :p_admin_user_flag := 'false';
+
+
+                ELSE
+
+                    :is_available := '1';
+                    :is_online := 'true';
+                    :p_doc_code := P_DOC_CODE;
+                    :p_center_api := P_CENTER_API;
+                    :p_admin_user_id := 'false';
+                    :p_admin_user_flag := '1';
+
+
+                END IF;
+
+            ELSE 
+
+                SELECT COUNT(*) INTO P_ADMIN_COUNT
+                FROM ISP_USER
+                WHERE USR_CONTACT = :doc_code
+                AND USR_PASSWORD = ENCRYPT_PW_DB(:doc_password)
+                AND NVL(USR_QUIT,1) <> 1;
+
+                IF P_ADMIN_COUNT = 1 THEN
+
+                    SELECT USR_ID INTO P_USR_ID
+                    FROM ISP_USER
+                    WHERE USR_CONTACT = :doc_code
+                    AND USR_PASSWORD = ENCRYPT_PW_DB(:doc_password)
+                    AND NVL(USR_QUIT,1) <> 1;
+
+
+                    :is_available := '1';
+                    :is_online := 'true';
+                    :p_doc_code := 'false';
+                    :p_center_api := P_CENTER_API;
+                    :p_admin_user_id := P_USR_ID;
+                    :p_admin_user_flag := '2';
+
+                ELSIF P_ADMIN_COUNT = 0 THEN
+
+                    :is_available := '0';
+                    :is_online := 'Your status is '|| P_DOC_STATUS ||', with effected date: '||P_EFF_DATE||'. So, You are not eligible to access this app.';
+                    :p_doc_code := 'false';
+                    :p_center_api := 'false';
+                    :p_admin_user_id := 'false';
+                    :p_admin_user_flag := 'false';
+
+                ELSE
+
+                    OPEN ADMIN_LIST FOR
+                    SELECT USR_ID, USR_NAME, USR_FNAME, USR_LNAME
+                    FROM ISP_USER
+                    WHERE USR_CONTACT = :doc_code
+                    AND USR_PASSWORD = ENCRYPT_PW_DB(:doc_password)
+                    AND NVL(USR_QUIT,1) <> 1;
+
+
+                    :is_available := '4';
+                    :is_online := 'Multiple Admin Id found for your Login Credentials. Please contact with System Administrator.';
+                    :p_doc_code := 'false';
+                    :p_center_api := P_CENTER_API;
+                    :p_admin_user_id := 'false';
+                    :p_admin_user_flag := '2';
+                    :p_admin_list := ADMIN_LIST;
+
+                END IF;
+
+            END IF;
+
+
+        ELSIF P_ONLINE_FLAG = 0 THEN
+
+            SELECT COUNT(*) INTO P_ADMIN_COUNT
+            FROM ISP_USER
+            WHERE USR_CONTACT = :doc_code
+            AND USR_PASSWORD = ENCRYPT_PW_DB(:doc_password)
+            AND NVL(USR_QUIT,1) <> 1;
+
+            IF P_ADMIN_COUNT = 1 THEN
+
+                SELECT USR_ID INTO P_USR_ID
+                FROM ISP_USER
+                WHERE USR_CONTACT = :doc_code
+                AND USR_PASSWORD = ENCRYPT_PW_DB(:doc_password)
+                AND NVL(USR_QUIT,1) <> 1;
+
+                :is_available := '1';
+                :is_online := 'true';
+                :p_doc_code := 'false';
+                :p_center_api := P_CENTER_API;
+                :p_admin_user_id := P_USR_ID;
+                :p_admin_user_flag := '2';
+
+            ELSIF P_ADMIN_COUNT = 0 THEN
+
+                :is_available := '0';
+                :is_online := 'OPAS is not available for your ID. Please contact with System Administrator.';
+                :p_doc_code := 'false';
+                :p_center_api := 'false';
+                :p_admin_user_id := 'false';
+                :p_admin_user_flag := 'false';
+
+            ELSE
+
+                OPEN ADMIN_LIST FOR
+                SELECT USR_ID, USR_NAME, USR_FNAME, USR_LNAME
+                FROM ISP_USER
+                WHERE USR_CONTACT = :doc_code
+                AND USR_PASSWORD = ENCRYPT_PW_DB(:doc_password)
+                AND NVL(USR_QUIT,1) <> 1;
+
+                :is_available := '4';
+                :is_online := 'Multiple Admin Id found for your Login Credentials. Please contact with System Administrator.';
+                :p_doc_code := 'false';
+                :p_center_api := P_CENTER_API;
+                :p_admin_user_id := 'false';
+                :p_admin_user_flag := '2';
+                :p_admin_list := ADMIN_LIST;
+
+            END IF;
+
+        ELSE 
+
+            SELECT COUNT(*) INTO P_ADMIN_COUNT
+            FROM ISP_USER
+            WHERE USR_CONTACT = :doc_code
+            AND USR_PASSWORD = ENCRYPT_PW_DB(:doc_password)
+            AND NVL(USR_QUIT,1) <> 1;
+
+            IF P_ADMIN_COUNT = 1 THEN
+
+                SELECT USR_ID INTO P_USR_ID
+                FROM ISP_USER
+                WHERE USR_CONTACT = :doc_code
+                AND USR_PASSWORD = ENCRYPT_PW_DB(:doc_password)
+                AND NVL(USR_QUIT,1) <> 1;
+
+                :is_available := '1';
+                :is_online := 'true';
+                :p_doc_code := 'false';
+                :p_center_api := P_CENTER_API;
+                :p_admin_user_id := P_USR_ID;
+                :p_admin_user_flag := '2';
+
+            ELSIF P_ADMIN_COUNT = 0 THEN
+
+                :is_available := '0';
+                :is_online := 'USER DEFINED ERROR';
+                :p_doc_code := 'false';
+                :p_center_api := 'false';
+                :p_admin_user_id := 'false';
+                :p_admin_user_flag := 'false';
+
+            ELSE
+
+                OPEN ADMIN_LIST FOR
+                SELECT USR_ID, USR_NAME, USR_FNAME, USR_LNAME
+                FROM ISP_USER
+                WHERE USR_CONTACT = :doc_code
+                AND USR_PASSWORD = ENCRYPT_PW_DB(:doc_password)
+                AND NVL(USR_QUIT,1) <> 1;
+
+                :is_available := '4';
+                :is_online := 'Multiple Admin Id found for your Login Credentials. Please contact with System Administrator.';
+                :p_doc_code := 'false';
+                :p_center_api := P_CENTER_API;
+                :p_admin_user_id := 'false';
+                :p_admin_user_flag := '2';
+                :p_admin_list := ADMIN_LIST;
+
+            END IF;
+
+        END IF;
+
+    ELSIF P_COUNT = 0 THEN 
+
+        SELECT COUNT(*) INTO P_ADMIN_COUNT
+        FROM ISP_USER
+        WHERE USR_CONTACT = :doc_code
+        AND USR_PASSWORD = ENCRYPT_PW_DB(:doc_password)
+        AND NVL(USR_QUIT,1) <> 1;
+
+        IF P_ADMIN_COUNT = 1 THEN
+
+            SELECT USR_ID INTO P_USR_ID
+            FROM ISP_USER
+            WHERE USR_CONTACT = :doc_code
+            AND USR_PASSWORD = ENCRYPT_PW_DB(:doc_password)
+            AND NVL(USR_QUIT,1) <> 1;
+
+            SELECT LIC_API_URL INTO P_CENTER_API FROM ISP_RUNAUTO;
+
+            :is_available := '1';
+            :is_online := 'true';
+            :p_doc_code := 'false';
+            :p_center_api := P_CENTER_API;
+            :p_admin_user_id := P_USR_ID;
+            :p_admin_user_flag := '2';
+
+        ELSIF P_ADMIN_COUNT = 0 THEN
+
+            :is_available := '2';
+            :is_online := 'Could Not Find Your ID';
+            :p_doc_code := 'false';
+            :p_center_api := 'false';
+            :p_admin_user_id := 'false';
+            :p_admin_user_flag := 'false';
+
+        ELSE
+
+            OPEN ADMIN_LIST FOR
+            SELECT USR_ID, USR_NAME, USR_FNAME, USR_LNAME
+            FROM ISP_USER
+            WHERE USR_CONTACT = :doc_code
+            AND USR_PASSWORD = ENCRYPT_PW_DB(:doc_password)
+            AND NVL(USR_QUIT,1) <> 1;
+
+            SELECT LIC_API_URL INTO P_CENTER_API FROM ISP_RUNAUTO;
+
+            :is_available := '4';
+            :is_online := 'Multiple Admin Id found for your Login Credentials. Please contact with System Administrator.';
+            :p_doc_code := 'false';
+            :p_center_api := P_CENTER_API;
+            :p_admin_user_id := 'false';
+            :p_admin_user_flag := '2';
+            :p_admin_list := ADMIN_LIST;
+
+        END IF;
+
+    ELSE 
+
+        SELECT COUNT(*) INTO P_ONLINE_COUNT
+        FROM DOCTOR_INFO DDM 
+        WHERE (DDM.DOC_PHONE = :doc_code OR DDM.DOC_CELL = :doc_code)
+        AND DDM.DOC_PASSWORD = :doc_password
+        AND NVL(DDM.DOC_ONLINE_FLAG,0) = 1;
+
+        IF P_ONLINE_COUNT = 1 THEN
+
+            SELECT DDM.DOC_CODE INTO P_DOC_CODE
+            FROM DOCTOR_INFO DDM 
+            WHERE (DDM.DOC_PHONE = :doc_code OR DDM.DOC_CELL = :doc_code)
+            AND DDM.DOC_PASSWORD = :doc_password
+            AND NVL(DDM.DOC_ONLINE_FLAG,0) = 1;
+
+            SELECT LIC_API_URL INTO P_CENTER_API FROM ISP_RUNAUTO;
+
+            SELECT (CASE WHEN NVL(UPPER(DOC_STATUS), 'NEW') = 'QUIT' AND DOC_EFF_DATE <= SYSDATE THEN 0
+                    WHEN NVL(UPPER(DOC_STATUS), 'NEW') = 'QUIT' AND DOC_EFF_DATE > SYSDATE THEN 1
+                    WHEN NVL(UPPER(DOC_STATUS), 'NEW') <> 'QUIT' AND DOC_EFF_DATE <= SYSDATE THEN 1
+                    WHEN NVL(UPPER(DOC_STATUS), 'NEW') <> 'QUIT' AND DOC_EFF_DATE > SYSDATE THEN 0
+                    WHEN NVL(UPPER(DOC_STATUS), 'NEW') = 'TRANSFER' AND DOC_EFF_DATE > SYSDATE THEN 1
+                    WHEN NVL(UPPER(DOC_STATUS), 'NEW') = 'TRANSFER' AND DOC_EFF_DATE <= SYSDATE THEN 0
+                    ELSE 1 END) user_avail, TO_CHAR(DOC_EFF_DATE,'dd-MON-yy') DOC_EFF_DATE, DOC_STATUS  
+            INTO P_USER_AVAILABILTY,P_EFF_DATE,P_DOC_STATUS
+            FROM DOCTOR_INFO
+            WHERE DOC_CODE = P_DOC_CODE;
+
+            IF P_USER_AVAILABILTY = 1 THEN
+
+                SELECT COUNT(*) INTO P_ADMIN_COUNT
+                FROM ISP_USER
+                WHERE USR_CONTACT = :doc_code
+                AND USR_PASSWORD = ENCRYPT_PW_DB(:doc_password)
+                AND NVL(USR_QUIT,1) <> 1;
+
+                IF P_ADMIN_COUNT > 0 THEN
+
+                    OPEN ADMIN_LIST FOR
+                    SELECT USR_ID, USR_NAME, USR_FNAME, USR_LNAME
+                    FROM ISP_USER
+                    WHERE USR_CONTACT = :doc_code
+                    AND USR_PASSWORD = ENCRYPT_PW_DB(:doc_password)
+                    AND NVL(USR_QUIT,1) <> 1;
+
+                    OPEN DOC_LIST FOR
+                    SELECT DOC_VAIL.DOC_CODE,DOC_VAIL.DOC_NAME, DEPARTMENT_SLV.DEPTS_NAME
+                    FROM DOCTOR_INFO DDM, (SELECT (CASE WHEN NVL(UPPER(DOC_STATUS), 'NEW') = 'QUIT' AND DOC_EFF_DATE <= SYSDATE THEN 0
+                                            WHEN NVL(UPPER(DOC_STATUS), 'NEW') = 'QUIT' AND DOC_EFF_DATE > SYSDATE THEN 1
+                                            WHEN NVL(UPPER(DOC_STATUS), 'NEW') <> 'QUIT' AND DOC_EFF_DATE <= SYSDATE THEN 1
+                                            WHEN NVL(UPPER(DOC_STATUS), 'NEW') <> 'QUIT' AND DOC_EFF_DATE > SYSDATE THEN 0
+                                            WHEN NVL(UPPER(DOC_STATUS), 'NEW') = 'TRANSFER' AND DOC_EFF_DATE > SYSDATE THEN 1
+                                            WHEN NVL(UPPER(DOC_STATUS), 'NEW') = 'TRANSFER' AND DOC_EFF_DATE <= SYSDATE THEN 0
+                                            ELSE 1 END) user_avail, DOC_CODE, DOC_NAME
+                                    FROM DOCTOR_INFO) DOC_VAIL, DEPARTMENT_SLV
+                    WHERE (DDM.DOC_PHONE = :doc_code OR DDM.DOC_CELL = :doc_code)
+                    AND DDM.DOC_PASSWORD = :doc_password
+                    AND DOC_VAIL.DOC_CODE = DDM.DOC_CODE
+                    AND DEPARTMENT_SLV.DEPTS_ID = DDM.DOC_DEPTS_ID
+                    AND NVL(DDM.DOC_ONLINE_FLAG,0) = 1
+                    AND DOC_VAIL.user_avail = 1;
+
+                    :is_available := '5';
+                    :is_online := 'Multiple User and Admin found for your Login Credentials. Please contact with System Administrator.';
+                    :p_doc_code := 'false';
+                    :p_center_api := P_CENTER_API;
+                    :p_doc_list := DOC_LIST;
+                    :p_admin_list := ADMIN_LIST;
+                    :p_admin_user_id := 'false';
+                    :p_admin_user_flag := 'false';
+
+
+                ELSE
+
+                    :is_available := '1';
+                    :is_online := 'true';
+                    :p_doc_code := P_DOC_CODE;
+                    :p_center_api := P_CENTER_API;
+                    :p_admin_user_id := 'false';
+                    :p_admin_user_flag := '1';
+
+                END IF;
+
+            ELSE 
+
+                SELECT COUNT(*) INTO P_ADMIN_COUNT
+                FROM ISP_USER
+                WHERE USR_CONTACT = :doc_code
+                AND USR_PASSWORD = ENCRYPT_PW_DB(:doc_password)
+                AND NVL(USR_QUIT,1) <> 1;
+
+                IF P_ADMIN_COUNT = 1 THEN
+
+                    SELECT USR_ID INTO P_USR_ID
+                    FROM ISP_USER
+                    WHERE USR_CONTACT = :doc_code
+                    AND USR_PASSWORD = ENCRYPT_PW_DB(:doc_password)
+                    AND NVL(USR_QUIT,1) <> 1;
+
+
+                    :is_available := '1';
+                    :is_online := 'true';
+                    :p_doc_code := 'false';
+                    :p_center_api := P_CENTER_API;
+                    :p_admin_user_id := P_USR_ID;
+                    :p_admin_user_flag := '2';
+
+                ELSIF P_ADMIN_COUNT = 0 THEN
+
+                    :is_available := '0';
+                    :is_online := 'Your status is '|| P_DOC_STATUS ||', with effected date: '||P_EFF_DATE||'. So, You are not eligible to access this app.';
+                    :p_doc_code := 'false';
+                    :p_center_api := 'false';
+                    :p_admin_user_id := 'false';
+                    :p_admin_user_flag := 'false';
+
+                ELSE
+
+                    OPEN ADMIN_LIST FOR
+                    SELECT USR_ID, USR_NAME, USR_FNAME, USR_LNAME
+                    FROM ISP_USER
+                    WHERE USR_CONTACT = :doc_code
+                    AND USR_PASSWORD = ENCRYPT_PW_DB(:doc_password)
+                    AND NVL(USR_QUIT,1) <> 1;
+
+
+                    :is_available := '4';
+                    :is_online := 'Multiple Admin Id found for your Login Credentials. Please contact with System Administrator.';
+                    :p_doc_code := 'false';
+                    :p_center_api := P_CENTER_API;
+                    :p_admin_user_id := 'false';
+                    :p_admin_user_flag := '2';
+                    :p_admin_list := ADMIN_LIST;
+
+                END IF;
+
+            END IF;
+
+        ELSIF P_ONLINE_COUNT = 0 THEN
+
+            SELECT COUNT(*) INTO P_ADMIN_COUNT
+            FROM ISP_USER
+            WHERE USR_CONTACT = :doc_code
+            AND USR_PASSWORD = ENCRYPT_PW_DB(:doc_password)
+            AND NVL(USR_QUIT,1) <> 1;
+
+            SELECT LIC_API_URL INTO P_CENTER_API FROM ISP_RUNAUTO;
+
+            IF P_ADMIN_COUNT = 1 THEN
+
+                SELECT USR_ID INTO P_USR_ID
+                FROM ISP_USER
+                WHERE USR_CONTACT = :doc_code
+                AND USR_PASSWORD = ENCRYPT_PW_DB(:doc_password)
+                AND NVL(USR_QUIT,1) <> 1;
+
+                :is_available := '1';
+                :is_online := 'true';
+                :p_doc_code := 'false';
+                :p_center_api := P_CENTER_API;
+                :p_admin_user_id := P_USR_ID;
+                :p_admin_user_flag := '2';
+
+            ELSIF P_ADMIN_COUNT = 0 THEN
+
+                :is_available := '0';
+                :is_online := 'OPAS is not available for your ID. Please contact with System Administrator.';
+                :p_doc_code := 'false';
+                :p_center_api := 'false';
+                :p_admin_user_id := 'false';
+                :p_admin_user_flag := 'false';
+
+            ELSE
+
+                OPEN ADMIN_LIST FOR
+                SELECT USR_ID, USR_NAME, USR_FNAME, USR_LNAME
+                FROM ISP_USER
+                WHERE USR_CONTACT = :doc_code
+                AND USR_PASSWORD = ENCRYPT_PW_DB(:doc_password)
+                AND NVL(USR_QUIT,1) <> 1;
+
+                :is_available := '4';
+                :is_online := 'Multiple Admin Id found for your Login Credentials. Please contact with System Administrator.';
+                :p_doc_code := 'false';
+                :p_center_api := P_CENTER_API;
+                :p_admin_user_id := 'false';
+                :p_admin_user_flag := '2';
+                :p_admin_list := ADMIN_LIST;
+
+            END IF;
+
+        ELSE 
+
+            SELECT COUNT(*) INTO P_USER_AVAIL_COUNT
+            FROM DOCTOR_INFO DDM, 
+                (SELECT (CASE WHEN NVL(UPPER(DOC_STATUS), 'NEW') = 'QUIT' AND DOC_EFF_DATE <= SYSDATE THEN 0
+                WHEN NVL(UPPER(DOC_STATUS), 'NEW') = 'QUIT' AND DOC_EFF_DATE > SYSDATE THEN 1
+                WHEN NVL(UPPER(DOC_STATUS), 'NEW') <> 'QUIT' AND DOC_EFF_DATE <= SYSDATE THEN 1
+                WHEN NVL(UPPER(DOC_STATUS), 'NEW') <> 'QUIT' AND DOC_EFF_DATE > SYSDATE THEN 0
+                WHEN NVL(UPPER(DOC_STATUS), 'NEW') = 'TRANSFER' AND DOC_EFF_DATE > SYSDATE THEN 1
+                WHEN NVL(UPPER(DOC_STATUS), 'NEW') = 'TRANSFER' AND DOC_EFF_DATE <= SYSDATE THEN 0
+                ELSE 1 END) user_avail, DOC_CODE
+                FROM DOCTOR_INFO) DOC_VAIL
+            WHERE (DDM.DOC_PHONE = :doc_code OR DDM.DOC_CELL = :doc_code)
+            AND DDM.DOC_PASSWORD = :doc_password
+            AND DOC_VAIL.DOC_CODE = DDM.DOC_CODE
+            AND NVL(DDM.DOC_ONLINE_FLAG,0) = 1
+            AND DOC_VAIL.user_avail = 1;
+
+            IF P_USER_AVAIL_COUNT = 1 THEN
+
+                SELECT DOC_VAIL.DOC_CODE INTO P_DOC_CODE
+                FROM DOCTOR_INFO DDM, (SELECT (CASE WHEN NVL(UPPER(DOC_STATUS), 'NEW') = 'QUIT' AND DOC_EFF_DATE <= SYSDATE THEN 0
+                        WHEN NVL(UPPER(DOC_STATUS), 'NEW') = 'QUIT' AND DOC_EFF_DATE > SYSDATE THEN 1
+                        WHEN NVL(UPPER(DOC_STATUS), 'NEW') <> 'QUIT' AND DOC_EFF_DATE <= SYSDATE THEN 1
+                        WHEN NVL(UPPER(DOC_STATUS), 'NEW') <> 'QUIT' AND DOC_EFF_DATE > SYSDATE THEN 0
+                        WHEN NVL(UPPER(DOC_STATUS), 'NEW') = 'TRANSFER' AND DOC_EFF_DATE > SYSDATE THEN 1
+                        WHEN NVL(UPPER(DOC_STATUS), 'NEW') = 'TRANSFER' AND DOC_EFF_DATE <= SYSDATE THEN 0
+                        ELSE 1 END) user_avail, DOC_CODE
+                FROM DOCTOR_INFO) DOC_VAIL
+                WHERE (DDM.DOC_PHONE = :doc_code OR DDM.DOC_CELL = :doc_code)
+                AND DDM.DOC_PASSWORD = :doc_password
+                AND DOC_VAIL.DOC_CODE = DDM.DOC_CODE
+                AND NVL(DDM.DOC_ONLINE_FLAG,0) = 1
+                AND DOC_VAIL.user_avail = 1;
+
+                SELECT LIC_API_URL INTO P_CENTER_API FROM ISP_RUNAUTO;
+
+                SELECT COUNT(*) INTO P_ADMIN_COUNT
+                FROM ISP_USER
+                WHERE USR_CONTACT = :doc_code
+                AND USR_PASSWORD = ENCRYPT_PW_DB(:doc_password)
+                AND NVL(USR_QUIT,1) <> 1;
+
+                IF P_ADMIN_COUNT > 0 THEN
+
+                    OPEN ADMIN_LIST FOR
+                    SELECT USR_ID, USR_NAME, USR_FNAME, USR_LNAME
+                    FROM ISP_USER
+                    WHERE USR_CONTACT = :doc_code
+                    AND USR_PASSWORD = ENCRYPT_PW_DB(:doc_password)
+                    AND NVL(USR_QUIT,1) <> 1;
+
+                    OPEN DOC_LIST FOR
+                    SELECT DOC_VAIL.DOC_CODE,DOC_VAIL.DOC_NAME, DEPARTMENT_SLV.DEPTS_NAME
+                    FROM DOCTOR_INFO DDM, (SELECT (CASE WHEN NVL(UPPER(DOC_STATUS), 'NEW') = 'QUIT' AND DOC_EFF_DATE <= SYSDATE THEN 0
+                                            WHEN NVL(UPPER(DOC_STATUS), 'NEW') = 'QUIT' AND DOC_EFF_DATE > SYSDATE THEN 1
+                                            WHEN NVL(UPPER(DOC_STATUS), 'NEW') <> 'QUIT' AND DOC_EFF_DATE <= SYSDATE THEN 1
+                                            WHEN NVL(UPPER(DOC_STATUS), 'NEW') <> 'QUIT' AND DOC_EFF_DATE > SYSDATE THEN 0
+                                            WHEN NVL(UPPER(DOC_STATUS), 'NEW') = 'TRANSFER' AND DOC_EFF_DATE > SYSDATE THEN 1
+                                            WHEN NVL(UPPER(DOC_STATUS), 'NEW') = 'TRANSFER' AND DOC_EFF_DATE <= SYSDATE THEN 0
+                                            ELSE 1 END) user_avail, DOC_CODE, DOC_NAME
+                                    FROM DOCTOR_INFO) DOC_VAIL, DEPARTMENT_SLV
+                    WHERE (DDM.DOC_PHONE = :doc_code OR DDM.DOC_CELL = :doc_code)
+                    AND DDM.DOC_PASSWORD = :doc_password
+                    AND DOC_VAIL.DOC_CODE = DDM.DOC_CODE
+                    AND DEPARTMENT_SLV.DEPTS_ID = DDM.DOC_DEPTS_ID
+                    AND NVL(DDM.DOC_ONLINE_FLAG,0) = 1
+                    AND DOC_VAIL.user_avail = 1;
+
+                    :is_available := '5';
+                    :is_online := 'Multiple User and Admin found for your Login Credentials. Please contact with System Administrator.';
+                    :p_doc_code := 'false';
+                    :p_center_api := P_CENTER_API;
+                    :p_doc_list := DOC_LIST;
+                    :p_admin_list := ADMIN_LIST;
+                    :p_admin_user_id := 'false';
+                    :p_admin_user_flag := 'false';
+
+                ELSE
+
+                    :is_available := '1';
+                    :is_online := 'true';
+                    :p_doc_code := P_DOC_CODE;
+                    :p_center_api := P_CENTER_API;
+                    :p_admin_user_id := 'false';
+                    :p_admin_user_flag := '1';
+
+                END IF;
+
+            ELSIF P_USER_AVAIL_COUNT = 0 THEN
+
+                SELECT TO_CHAR(DOCTOR_INFO.DOC_EFF_DATE,'dd-MON-yy') DOC_EFF_DATE, DOCTOR_INFO.DOC_STATUS  INTO P_EFF_DATE,P_DOC_STATUS
+                FROM (SELECT Max(DOC_VAIL.DOC_CODE) CODE
+                            FROM DOCTOR_INFO DDM, (SELECT (CASE WHEN NVL(UPPER(DOC_STATUS), 'NEW') = 'QUIT' AND DOC_EFF_DATE <= SYSDATE THEN 0
+                                    WHEN NVL(UPPER(DOC_STATUS), 'NEW') = 'QUIT' AND DOC_EFF_DATE > SYSDATE THEN 1
+                                    WHEN NVL(UPPER(DOC_STATUS), 'NEW') <> 'QUIT' AND DOC_EFF_DATE <= SYSDATE THEN 1
+                                    WHEN NVL(UPPER(DOC_STATUS), 'NEW') <> 'QUIT' AND DOC_EFF_DATE > SYSDATE THEN 0
+                                    WHEN NVL(UPPER(DOC_STATUS), 'NEW') = 'TRANSFER' AND DOC_EFF_DATE > SYSDATE THEN 1
+                                    WHEN NVL(UPPER(DOC_STATUS), 'NEW') = 'TRANSFER' AND DOC_EFF_DATE <= SYSDATE THEN 0
+                                    ELSE 1 END) user_avail, DOC_CODE
+                            FROM DOCTOR_INFO) DOC_VAIL
+                            WHERE (DDM.DOC_PHONE = :doc_code OR DDM.DOC_CELL = :doc_code)
+                            AND DDM.DOC_PASSWORD = :doc_password
+                            AND DOC_VAIL.DOC_CODE = DDM.DOC_CODE
+                            AND NVL(DDM.DOC_ONLINE_FLAG,0) = 1
+                            AND DOC_VAIL.user_avail = 0) DOC_A, DOCTOR_INFO
+                WHERE DOCTOR_INFO.DOC_CODE = DOC_A.CODE;
+
+                SELECT COUNT(*) INTO P_ADMIN_COUNT
+                FROM ISP_USER
+                WHERE USR_CONTACT = :doc_code
+                AND USR_PASSWORD = ENCRYPT_PW_DB(:doc_password)
+                AND NVL(USR_QUIT,1) <> 1;
+
+                SELECT LIC_API_URL INTO P_CENTER_API FROM ISP_RUNAUTO;
+
+                IF P_ADMIN_COUNT = 1 THEN
+
+                    SELECT USR_ID INTO P_USR_ID
+                    FROM ISP_USER
+                    WHERE USR_CONTACT = :doc_code
+                    AND USR_PASSWORD = ENCRYPT_PW_DB(:doc_password)
+                    AND NVL(USR_QUIT,1) <> 1;
+
+                    :is_available := '1';
+                    :is_online := 'true';
+                    :p_doc_code := 'false';
+                    :p_center_api := P_CENTER_API;
+                    :p_admin_user_id := P_USR_ID;
+                    :p_admin_user_flag := '2';
+
+                ELSIF P_ADMIN_COUNT = 0 THEN
+
+                    :is_available := '0';
+                    :is_online := 'Your status is '|| P_DOC_STATUS ||', with effected date: '||P_EFF_DATE||'. So, You are not eligible to access this app.';
+                    :p_doc_code := 'false';
+                    :p_center_api := 'false';
+                    :p_admin_user_id := 'false';
+                    :p_admin_user_flag := 'false';
+
+                ELSE
+
+                    OPEN ADMIN_LIST FOR
+                    SELECT USR_ID, USR_NAME, USR_FNAME, USR_LNAME
+                    FROM ISP_USER
+                    WHERE USR_CONTACT = :doc_code
+                    AND USR_PASSWORD = ENCRYPT_PW_DB(:doc_password)
+                    AND NVL(USR_QUIT,1) <> 1;
+
+                    :is_available := '4';
+                    :is_online := 'Multiple Admin Id found for your Login Credentials. Please contact with System Administrator.';
+                    :p_doc_code := 'false';
+                    :p_center_api := P_CENTER_API;
+                    :p_admin_user_id := 'false';
+                    :p_admin_user_flag := '2';
+                    :p_admin_list := ADMIN_LIST;
+
+                END IF;
+
+
+            ELSE
+                OPEN DOC_LIST FOR
+                SELECT DOC_VAIL.DOC_CODE,DOC_VAIL.DOC_NAME, DEPARTMENT_SLV.DEPTS_NAME
+                FROM DOCTOR_INFO DDM, (SELECT (CASE WHEN NVL(UPPER(DOC_STATUS), 'NEW') = 'QUIT' AND DOC_EFF_DATE <= SYSDATE THEN 0
+                                        WHEN NVL(UPPER(DOC_STATUS), 'NEW') = 'QUIT' AND DOC_EFF_DATE > SYSDATE THEN 1
+                                        WHEN NVL(UPPER(DOC_STATUS), 'NEW') <> 'QUIT' AND DOC_EFF_DATE <= SYSDATE THEN 1
+                                        WHEN NVL(UPPER(DOC_STATUS), 'NEW') <> 'QUIT' AND DOC_EFF_DATE > SYSDATE THEN 0
+                                        WHEN NVL(UPPER(DOC_STATUS), 'NEW') = 'TRANSFER' AND DOC_EFF_DATE > SYSDATE THEN 1
+                                        WHEN NVL(UPPER(DOC_STATUS), 'NEW') = 'TRANSFER' AND DOC_EFF_DATE <= SYSDATE THEN 0
+                                        ELSE 1 END) user_avail, DOC_CODE, DOC_NAME
+                                FROM DOCTOR_INFO) DOC_VAIL, DEPARTMENT_SLV
+                WHERE (DDM.DOC_PHONE = :doc_code OR DDM.DOC_CELL = :doc_code)
+                AND DDM.DOC_PASSWORD = :doc_password
+                AND DOC_VAIL.DOC_CODE = DDM.DOC_CODE
+                AND DEPARTMENT_SLV.DEPTS_ID = DDM.DOC_DEPTS_ID
+                AND NVL(DDM.DOC_ONLINE_FLAG,0) = 1
+                AND DOC_VAIL.user_avail = 1;
+
+                SELECT LIC_API_URL INTO P_CENTER_API FROM ISP_RUNAUTO;
+
+                SELECT COUNT(*) INTO P_ADMIN_COUNT
+                FROM ISP_USER
+                WHERE USR_CONTACT = :doc_code
+                AND USR_PASSWORD = ENCRYPT_PW_DB(:doc_password)
+                AND NVL(USR_QUIT,1) <> 1;
+
+                IF P_ADMIN_COUNT > 0 THEN
+
+                    OPEN ADMIN_LIST FOR
+                    SELECT USR_ID, USR_NAME, USR_FNAME, USR_LNAME
+                    FROM ISP_USER
+                    WHERE USR_CONTACT = :doc_code
+                    AND USR_PASSWORD = ENCRYPT_PW_DB(:doc_password)
+                    AND NVL(USR_QUIT,1) <> 1;
+
+                    :is_available := '5';
+                    :is_online := 'Multiple User and Admin found for your Login Credentials. Please contact with System Administrator.';
+                    :p_doc_code := 'false';
+                    :p_center_api := P_CENTER_API;
+                    :p_doc_list := DOC_LIST;
+                    :p_admin_list := ADMIN_LIST;
+                    :p_admin_user_id := 'false';
+                    :p_admin_user_flag := 'false';
+
+                ELSE
+
+                    :is_available := '3';
+                    :is_online := 'Multiple User found for your Login Credentials. Please contact with System Administrator.';
+                    :p_doc_code := 'false';
+                    :p_center_api := P_CENTER_API;
+                    :p_doc_list := DOC_LIST;
+                    :p_admin_user_id := 'false';
+                    :p_admin_user_flag := '1';
+
+                END IF;
+
+
+            END IF;
+
+
+        END IF;
+
+
+    END IF;
+
+
+END;
