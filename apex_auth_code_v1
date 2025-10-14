@@ -1,0 +1,85 @@
+
+function DB_authentication (
+    p_username in varchar2,
+    p_password  in varchar2 )
+    
+    return boolean
+is
+  V_USR_NAME        VARCHAR2(200);
+  V_USR_PASSWORD    VARCHAR2(200);
+  v_max number;
+  lv_ip_address     VARCHAR2(200);
+  lv_host           VARCHAR2(200);
+  V_COUNT_USER_DOC number;
+  V_COUNT_USER_ADMIN number;
+  
+BEGIN    
+  
+--doctor           
+SELECT count(distinct DOC_PHONE) --DOC_VAIL.DOC_CODE,DOC_VAIL.DOC_NAME, DEPARTMENT_SLV.DEPTS_NAME
+INTO V_COUNT_USER_DOC --V_USR_NAME,V_USR_PASSWORD
+FROM DOCTOR_INFO DDM, ( SELECT (CASE WHEN NVL(UPPER(DOC_STATUS), 'NEW') = 'QUIT' AND DOC_EFF_DATE <= SYSDATE THEN 0
+                            WHEN NVL(UPPER(DOC_STATUS), 'NEW') = 'QUIT' AND DOC_EFF_DATE > SYSDATE THEN 1
+                            WHEN NVL(UPPER(DOC_STATUS), 'NEW') <> 'QUIT' AND DOC_EFF_DATE <= SYSDATE THEN 1
+                            WHEN NVL(UPPER(DOC_STATUS), 'NEW') <> 'QUIT' AND DOC_EFF_DATE > SYSDATE THEN 0
+                            WHEN NVL(UPPER(DOC_STATUS), 'NEW') = 'TRANSFER' AND DOC_EFF_DATE > SYSDATE THEN 1
+                            WHEN NVL(UPPER(DOC_STATUS), 'NEW') = 'TRANSFER' AND DOC_EFF_DATE <= SYSDATE THEN 0
+                            ELSE 1 END) user_avail, DOC_CODE, DOC_NAME
+                        FROM DOCTOR_INFO
+                        where DOC_PHONE = p_username OR DOC_CELL = p_username) DOC_VAIL, DEPARTMENT_SLV
+WHERE (DDM.DOC_PHONE = p_username OR DDM.DOC_CELL = p_username)
+AND DDM.DOC_PASSWORD = p_password
+AND DOC_VAIL.DOC_CODE = DDM.DOC_CODE
+AND DEPARTMENT_SLV.DEPTS_ID = DDM.DOC_DEPTS_ID
+AND NVL(DDM.DOC_ONLINE_FLAG,0) = 1
+AND DOC_VAIL.user_avail = 1;
+
+--admin check
+SELECT count(distinct USR_NAME)--, USR_PASSWORD
+INTO  V_COUNT_USER_ADMIN --V_USR_NAME,V_USR_PASSWORD
+FROM ISP_USER
+WHERE USR_CONTACT = p_username
+AND USR_PASSWORD = ENCRYPT_PW_DB(p_password)
+AND NVL(USR_QUIT,1) <> 1;
+ 
+    IF (V_COUNT_USER_ADMIN >= 1) or (V_COUNT_USER_DOC >= 1) THEN
+  
+        select nvl(max(IULL_ID),0)+1 into v_max from ISP_USER_LOGIN_LOG;
+        SELECT SYS_CONTEXT ('USERENV', 'IP_ADDRESS') INTO lv_ip_address FROM DUAL;
+        SELECT SYS_CONTEXT ('USERENV', 'HOST') INTO lv_host FROM DUAL;
+        
+        insert into ISP_USER_LOGIN_LOG(IULL_ID,
+            IULL_USER_ID,
+            IULL_CLIENT_HOST_NAME,
+            IULL_CLIENT_IP_ADDR,
+            IULL_CLIENT_HOST_USER_NAME,
+            IULL_SESSION_USER_ID,
+            IULL_SESSION_ID,
+            IULL_LOGIN_TIME,
+            IULL_LOGIN_OUT,
+            IULL_OS_NAME,
+            IULL_LOG_TYPE
+            )
+        values (
+            v_max,
+            nvl(p_username,:P9999_USERNAME),
+            lv_host,
+            lv_ip_address,
+            null,
+            null,
+            :app_session,
+            SYSTIMESTAMP,
+            null,
+            null,
+            2 -- web
+        );
+        
+        RETURN TRUE;
+    
+    ELSE 
+  
+        RETURN FALSE;
+    
+    END IF;
+
+END DB_authentication;
