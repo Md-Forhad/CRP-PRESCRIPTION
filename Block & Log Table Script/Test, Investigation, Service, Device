@@ -1,0 +1,178 @@
+--Test/investigation/service/device
+ALTER TABLE PAYMENT_FEE_NAME_BLOCK DROP PRIMARY KEY CASCADE;
+
+DROP TABLE PAYMENT_FEE_NAME_BLOCK CASCADE CONSTRAINTS;
+
+CREATE TABLE PAYMENT_FEE_NAME_BLOCK (
+  PFN_ID                   NUMBER(10)           NOT NULL,
+  PFN_PFM_ID               NUMBER(10),
+  PFN_FEE_NAME             VARCHAR2(200 BYTE),
+  PFN_NOTES                VARCHAR2(200 BYTE),
+  PFN_QUIT_FLAG            NUMBER(2),
+  PFN_ONLINE_FLAG          NUMBER(2),
+  PFN_FEE_CATEGORISE_FLAG  NUMBER(2),
+  PFN_VIDEO_CONF_FLAG      NUMBER(2)            DEFAULT 0,
+  PFN_SERVICE_PCT_FLAG     NUMBER(2)            DEFAULT 1,
+  PFN_SERVICE_PCT_ONLINE   NUMBER(4,2)          DEFAULT 5,
+  PFN_SERVICE_PCT_OFFLINE  NUMBER(4,2)          DEFAULT 3,
+  PFN_ENTRY_BY             VARCHAR2(20 BYTE),
+  PFN_ENTRY_TIME           VARCHAR2(30 BYTE),
+  PFN_UPDATE_BY            VARCHAR2(20 BYTE),
+  PFN_UPDATE_TIME          VARCHAR2(30 BYTE),
+  PFN_CID_ID               NUMBER(10),
+  PFN_DOC_ID               NUMBER(20)
+);
+
+COMMENT ON COLUMN PAYMENT_FEE_NAME.PFN_FEE_CATEGORISE_FLAG IS '1 = PT, 2 = OT, 3 = SLT';
+
+COMMENT ON COLUMN PAYMENT_FEE_NAME.PFN_VIDEO_CONF_FLAG IS '1 = Video Conferencing, 0 or Null = regular';
+
+COMMENT ON COLUMN PAYMENT_FEE_NAME.PFN_SERVICE_PCT_FLAG IS '1 = Service Percentage Enable, 0 or Null = Service Percentage Disable';
+
+CREATE UNIQUE INDEX PAYMENT_FEE_NAME_BLOCK_PK ON PAYMENT_FEE_NAME_BLOCK (PFN_ID);
+
+-----------------------------------LOG START------------------------------------
+ALTER TABLE PAYMENT_FEE_NAME_BLOCK_LOG DROP PRIMARY KEY CASCADE;
+
+DROP TABLE PAYMENT_FEE_NAME_BLOCK_LOG CASCADE CONSTRAINTS;
+
+CREATE TABLE PAYMENT_FEE_NAME_BLOCK_LOG (
+  PFN_BLOCK_LOG_ID         NUMBER,
+  PFN_ID                   NUMBER(10),
+  PFN_PFM_ID               NUMBER(10),
+  PFN_FEE_NAME             VARCHAR2(200),
+  PFN_NOTES                VARCHAR2(200),
+  PFN_QUIT_FLAG            NUMBER(2),
+  PFN_ONLINE_FLAG          NUMBER(2),
+  PFN_FEE_CATEGORISE_FLAG  NUMBER(2),
+  PFN_VIDEO_CONF_FLAG      NUMBER(2),
+  PFN_SERVICE_PCT_FLAG     NUMBER(2),
+  PFN_SERVICE_PCT_ONLINE   NUMBER(4,2),
+  PFN_SERVICE_PCT_OFFLINE  NUMBER(4,2),
+  PFN_ENTRY_BY             VARCHAR2(20),
+  PFN_ENTRY_TIME           VARCHAR2(30),
+  PFN_UPDATE_BY            VARCHAR2(20),
+  PFN_UPDATE_TIME          VARCHAR2(30),
+  PFN_LOG_TIME             VARCHAR2(30),
+  PFN_LOG_STATUS           VARCHAR2(10),
+  PFN_CID_ID               NUMBER(10),
+  PFN_DOC_ID               NUMBER(20)
+);
+
+CREATE UNIQUE INDEX PAYMENT_FEE_NAME_BLOCK_LOG_PK ON PAYMENT_FEE_NAME_BLOCK_LOG (PFN_BLOCK_LOG_ID);
+
+CREATE OR REPLACE TRIGGER PFN_BLOCK_LOG_PRE_INSERT
+BEFORE INSERT ON PAYMENT_FEE_NAME_BLOCK_LOG
+REFERENCING OLD AS OLD NEW AS NEW
+FOR EACH ROW
+BEGIN
+    SELECT NVL(MAX(PFN_BLOCK_LOG_ID),0) + 1
+    INTO :NEW.PFN_BLOCK_LOG_ID
+    FROM PAYMENT_FEE_NAME_BLOCK_LOG;
+END;
+/
+
+ALTER TABLE PAYMENT_FEE_NAME_BLOCK_LOG ADD (
+  CONSTRAINT PAYMENT_FEE_NAME_BLOCK_LOG_PK PRIMARY KEY (PFN_BLOCK_LOG_ID)
+  USING INDEX PAYMENT_FEE_NAME_BLOCK_LOG_PK ENABLE VALIDATE);
+---------------------------------------LOG END----------------------------------
+
+
+CREATE OR REPLACE TRIGGER PFN_BLOCK_PRE_INSERT
+BEFORE INSERT OR UPDATE OR DELETE
+ON PAYMENT_FEE_NAME_BLOCK
+REFERENCING OLD AS OLD NEW AS NEW
+FOR EACH ROW
+DECLARE
+    STATUS VARCHAR2(10);
+BEGIN
+    IF INSERTING OR UPDATING THEN
+        IF INSERTING THEN STATUS := 'INSERT';
+        ELSIF UPDATING THEN STATUS := 'UPDATE';
+        END IF;
+		
+        INSERT INTO PAYMENT_FEE_NAME_BLOCK_LOG (PFN_ID, 
+                                          PFN_PFM_ID, 
+                                          PFN_FEE_NAME, 
+                                          PFN_NOTES, 
+                                          PFN_QUIT_FLAG, 
+                                          PFN_ONLINE_FLAG, 
+                                          PFN_FEE_CATEGORISE_FLAG, 
+                                          PFN_VIDEO_CONF_FLAG, 
+                                          PFN_SERVICE_PCT_FLAG, 
+                                          PFN_SERVICE_PCT_ONLINE, 
+                                          PFN_SERVICE_PCT_OFFLINE,
+                                          PFN_ENTRY_BY, 
+                                          PFN_ENTRY_TIME, 
+                                          PFN_UPDATE_BY, 
+                                          PFN_UPDATE_TIME, 
+                                          PFN_LOG_TIME, 
+                                          PFN_LOG_STATUS,
+                                          PFN_CID_ID,
+                                          PFN_DOC_ID)
+        VALUES (:NEW.PFN_ID, 
+                :NEW.PFN_PFM_ID, 
+                :NEW.PFN_FEE_NAME, 
+                :NEW.PFN_NOTES, 
+                :NEW.PFN_QUIT_FLAG, 
+                :NEW.PFN_ONLINE_FLAG, 
+                :NEW.PFN_FEE_CATEGORISE_FLAG, 
+                :NEW.PFN_VIDEO_CONF_FLAG, 
+                :NEW.PFN_SERVICE_PCT_FLAG, 
+                :NEW.PFN_SERVICE_PCT_ONLINE, 
+                :NEW.PFN_SERVICE_PCT_OFFLINE, 
+                :NEW.PFN_ENTRY_BY, 
+                :NEW.PFN_ENTRY_TIME, 
+                :NEW.PFN_UPDATE_BY, 
+                :NEW.PFN_UPDATE_TIME, 
+                TO_CHAR(SYSDATE,'DD/MM/RRRR HH12:MI:SS AM'),
+                STATUS, 
+                :NEW.PFN_CID_ID,
+                :NEW.PFN_DOC_ID);
+    ELSE
+        STATUS := 'DELETE';
+        INSERT INTO PAYMENT_FEE_NAME_BLOCK_LOG (PFN_ID, 
+                                          PFN_PFM_ID, 
+                                          PFN_FEE_NAME, 
+                                          PFN_NOTES, 
+                                          PFN_QUIT_FLAG, 
+                                          PFN_ONLINE_FLAG, 
+                                          PFN_FEE_CATEGORISE_FLAG, 
+                                          PFN_VIDEO_CONF_FLAG, 
+                                          PFN_SERVICE_PCT_FLAG, 
+                                          PFN_SERVICE_PCT_ONLINE, 
+                                          PFN_SERVICE_PCT_OFFLINE,
+                                          PFN_ENTRY_BY, 
+                                          PFN_ENTRY_TIME, 
+                                          PFN_UPDATE_BY, 
+                                          PFN_UPDATE_TIME, 
+                                          PFN_LOG_TIME, 
+                                          PFN_LOG_STATUS,
+                                          PFN_CID_ID,
+                                          PFN_DOC_ID)
+        VALUES (:OLD.PFN_ID, 
+                :OLD.PFN_PFM_ID, 
+                :OLD.PFN_FEE_NAME, 
+                :OLD.PFN_NOTES, 
+                :OLD.PFN_QUIT_FLAG, 
+                :OLD.PFN_ONLINE_FLAG, 
+                :OLD.PFN_FEE_CATEGORISE_FLAG, 
+                :OLD.PFN_VIDEO_CONF_FLAG, 
+                :OLD.PFN_SERVICE_PCT_FLAG, 
+                :OLD.PFN_SERVICE_PCT_ONLINE, 
+                :OLD.PFN_SERVICE_PCT_OFFLINE,
+                :OLD.PFN_ENTRY_BY, 
+                :OLD.PFN_ENTRY_TIME, 
+                :OLD.PFN_UPDATE_BY, 
+                :OLD.PFN_UPDATE_TIME, 
+                TO_CHAR(SYSDATE,'DD/MM/RRRR HH12:MI:SS AM'),
+                STATUS, 
+                :OLD.PFN_CID_ID,
+                :OLD.PFN_DOC_ID);
+    END IF;
+END;
+/
+
+ALTER TABLE PAYMENT_FEE_NAME_BLOCK ADD (
+  CONSTRAINT PAYMENT_FEE_NAME_BLOCK_PK PRIMARY KEY (PFN_ID)
+  USING INDEX PAYMENT_FEE_NAME_BLOCK_PK ENABLE VALIDATE);
