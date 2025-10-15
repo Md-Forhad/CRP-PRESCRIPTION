@@ -4,7 +4,8 @@ ALTER TABLE PAYMENT_FEE_NAME_BLOCK DROP PRIMARY KEY CASCADE;
 DROP TABLE PAYMENT_FEE_NAME_BLOCK CASCADE CONSTRAINTS;
 
 CREATE TABLE PAYMENT_FEE_NAME_BLOCK (
-  PFN_ID                   NUMBER(10)           NOT NULL,
+  PFN_BLOCK_ID             NUMBER(20)           NOT NULL,
+  PFN_ID                   NUMBER(10),
   PFN_PFM_ID               NUMBER(10),
   PFN_FEE_NAME             VARCHAR2(200 BYTE),
   PFN_NOTES                VARCHAR2(200 BYTE),
@@ -29,7 +30,7 @@ COMMENT ON COLUMN PAYMENT_FEE_NAME_BLOCK.PFN_VIDEO_CONF_FLAG IS '1 = Video Confe
 
 COMMENT ON COLUMN PAYMENT_FEE_NAME_BLOCK.PFN_SERVICE_PCT_FLAG IS '1 = Service Percentage Enable, 0 or Null = Service Percentage Disable';
 
-CREATE UNIQUE INDEX PAYMENT_FEE_NAME_BLOCK_PK ON PAYMENT_FEE_NAME_BLOCK (PFN_ID);
+CREATE UNIQUE INDEX PAYMENT_FEE_NAME_BLOCK_PK ON PAYMENT_FEE_NAME_BLOCK (PFN_BLOCK_ID);
 
 -----------------------------------LOG START------------------------------------
 ALTER TABLE PAYMENT_FEE_NAME_BLOCK_LOG DROP PRIMARY KEY CASCADE;
@@ -38,6 +39,7 @@ DROP TABLE PAYMENT_FEE_NAME_BLOCK_LOG CASCADE CONSTRAINTS;
 
 CREATE TABLE PAYMENT_FEE_NAME_BLOCK_LOG (
   PFN_BLOCK_LOG_ID         NUMBER,
+  PFN_BLOCK_ID             NUMBER(20),
   PFN_ID                   NUMBER(10),
   PFN_PFM_ID               NUMBER(10),
   PFN_FEE_NAME             VARCHAR2(200),
@@ -91,7 +93,8 @@ BEGIN
         ELSIF UPDATING THEN STATUS := 'UPDATE';
         END IF;
 		
-        INSERT INTO PAYMENT_FEE_NAME_BLOCK_LOG (PFN_ID, 
+        INSERT INTO PAYMENT_FEE_NAME_BLOCK_LOG (PFN_BLOCK_ID,
+                                          PFN_ID, 
                                           PFN_PFM_ID, 
                                           PFN_FEE_NAME, 
                                           PFN_NOTES, 
@@ -110,7 +113,8 @@ BEGIN
                                           PFN_LOG_STATUS,
                                           PFN_CID_ID,
                                           PFN_DOC_ID)
-        VALUES (:NEW.PFN_ID, 
+        VALUES (:NEW.PFN_BLOCK_ID,
+                :NEW.PFN_ID, 
                 :NEW.PFN_PFM_ID, 
                 :NEW.PFN_FEE_NAME, 
                 :NEW.PFN_NOTES, 
@@ -131,7 +135,8 @@ BEGIN
                 :NEW.PFN_DOC_ID);
     ELSE
         STATUS := 'DELETE';
-        INSERT INTO PAYMENT_FEE_NAME_BLOCK_LOG (PFN_ID, 
+        INSERT INTO PAYMENT_FEE_NAME_BLOCK_LOG (PFN_BLOCK_ID,
+                                          PFN_ID, 
                                           PFN_PFM_ID, 
                                           PFN_FEE_NAME, 
                                           PFN_NOTES, 
@@ -150,7 +155,8 @@ BEGIN
                                           PFN_LOG_STATUS,
                                           PFN_CID_ID,
                                           PFN_DOC_ID)
-        VALUES (:OLD.PFN_ID, 
+        VALUES (:OLD.PFN_BLOCK_ID,
+                :OLD.PFN_ID, 
                 :OLD.PFN_PFM_ID, 
                 :OLD.PFN_FEE_NAME, 
                 :OLD.PFN_NOTES, 
@@ -174,5 +180,5 @@ END;
 /
 
 ALTER TABLE PAYMENT_FEE_NAME_BLOCK ADD (
-  CONSTRAINT PAYMENT_FEE_NAME_BLOCK_PK PRIMARY KEY (PFN_ID)
+  CONSTRAINT PAYMENT_FEE_NAME_BLOCK_PK PRIMARY KEY (PFN_BLOCK_ID)
   USING INDEX PAYMENT_FEE_NAME_BLOCK_PK ENABLE VALIDATE);
