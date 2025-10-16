@@ -1,0 +1,117 @@
+--Complaints
+ALTER TABLE COMPLAIN_MST_BLOCK DROP PRIMARY KEY CASCADE;
+
+DROP TABLE COMPLAIN_MST_BLOCK CASCADE CONSTRAINTS;
+
+CREATE TABLE COMPLAIN_MST_BLOCK (
+  CM_BLOCK_ID       NUMBER(20)                  NOT NULL,
+  CM_ID             NUMBER(10),
+  CM_BLOCK_STATUS   NUMBER(2) DEFAULT 1,
+  CM_DOC_ID         NUMBER(20),
+  CM_ENTRY_BY       VARCHAR2(30),
+  CM_ENTRY_TIME     DATE DEFAULT SYSDATE
+);
+
+CREATE UNIQUE INDEX COMPLAIN_MST_BLOCK_PK ON COMPLAIN_MST_BLOCK (CM_BLOCK_ID);
+
+CREATE OR REPLACE TRIGGER CM_BLOCK_PRE_INSERT
+BEFORE INSERT ON COMPLAIN_MST_BLOCK
+REFERENCING OLD AS OLD NEW AS NEW
+FOR EACH ROW
+BEGIN
+    SELECT NVL(MAX(CM_BLOCK_ID),0) + 1
+    INTO :NEW.CM_BLOCK_ID
+    FROM COMPLAIN_MST_BLOCK;
+END;
+/
+
+-----------------------------------LOG START------------------------------------
+ALTER TABLE COMPLAIN_MST_BLOCK_LOG DROP PRIMARY KEY CASCADE;
+
+DROP TABLE COMPLAIN_MST_BLOCK_LOG CASCADE CONSTRAINTS;
+
+CREATE TABLE COMPLAIN_MST_BLOCK_LOG (
+  CM_BLOCK_LOG_ID   NUMBER           NOT NULL,
+  CM_BLOCK_ID       NUMBER(20),
+  CM_ID             NUMBER(10),
+  CM_BLOCK_STATUS   NUMBER(2),
+  CM_DOC_ID         NUMBER(20),
+  CM_ENTRY_BY       VARCHAR2(30),
+  CM_ENTRY_TIME     DATE,
+  CM_LOG_TIME       VARCHAR2(30),
+  CM_LOG_STATUS     VARCHAR2(10)
+);
+
+CREATE UNIQUE INDEX COMPLAIN_MST_BLOCK_LOG_PK ON COMPLAIN_MST_BLOCK_LOG (CM_BLOCK_LOG_ID);
+
+CREATE OR REPLACE TRIGGER CM_BLOCK_LOG_PRE_INS
+BEFORE INSERT ON COMPLAIN_MST_BLOCK_LOG
+REFERENCING OLD AS OLD NEW AS NEW
+FOR EACH ROW
+BEGIN
+    SELECT NVL(MAX(CM_BLOCK_LOG_ID),0) + 1
+    INTO :NEW.CM_BLOCK_LOG_ID
+    FROM COMPLAIN_MST_BLOCK_LOG;
+END;
+/
+
+ALTER TABLE COMPLAIN_MST_BLOCK_LOG ADD (
+  CONSTRAINT COMPLAIN_MST_BLOCK_LOG_PK PRIMARY KEY (CM_BLOCK_LOG_ID)
+  USING INDEX COMPLAIN_MST_BLOCK_LOG_PK ENABLE VALIDATE);
+---------------------------------------LOG END----------------------------------
+
+
+CREATE OR REPLACE TRIGGER CM_BLOCK_AUDIT
+BEFORE INSERT OR UPDATE OR DELETE
+ON COMPLAIN_MST_BLOCK
+REFERENCING OLD AS OLD NEW AS NEW
+FOR EACH ROW
+DECLARE
+    STATUS VARCHAR2(10);
+BEGIN
+    IF INSERTING OR UPDATING THEN
+        IF INSERTING THEN STATUS := 'INSERT';
+        ELSIF UPDATING THEN STATUS := 'UPDATE';
+        END IF;
+		
+        INSERT INTO COMPLAIN_MST_BLOCK_LOG (CM_BLOCK_ID,
+                                          CM_ID, 
+                                          CM_BLOCK_STATUS, 
+                                          CM_DOC_ID, 
+                                          CM_ENTRY_BY, 
+                                          CM_ENTRY_TIME, 
+                                          CM_LOG_TIME, 
+                                          CM_LOG_STATUS)
+        VALUES (:NEW.CM_BLOCK_ID,
+                :NEW.CM_ID, 
+                :NEW.CM_BLOCK_STATUS, 
+                :NEW.CM_DOC_ID, 
+                :NEW.CM_ENTRY_BY, 
+                :NEW.CM_ENTRY_TIME,  
+                TO_CHAR(SYSDATE,'DD/MM/RRRR HH12:MI:SS AM'),
+                STATUS);
+    ELSE
+        STATUS := 'DELETE';
+        INSERT INTO COMPLAIN_MST_BLOCK_LOG (CM_BLOCK_ID,
+                                          CM_ID, 
+                                          CM_BLOCK_STATUS, 
+                                          CM_DOC_ID, 
+                                          CM_ENTRY_BY, 
+                                          CM_ENTRY_TIME, 
+                                          CM_LOG_TIME, 
+                                          CM_LOG_STATUS)
+        VALUES (:OLD.CM_BLOCK_ID,
+                :OLD.CM_ID, 
+                :OLD.CM_BLOCK_STATUS, 
+                :OLD.CM_DOC_ID, 
+                :OLD.CM_ENTRY_BY, 
+                :OLD.CM_ENTRY_TIME, 
+                TO_CHAR(SYSDATE,'DD/MM/RRRR HH12:MI:SS AM'),
+                STATUS);
+    END IF;
+END;
+/
+
+ALTER TABLE COMPLAIN_MST_BLOCK ADD (
+  CONSTRAINT COMPLAIN_MST_BLOCK_PK PRIMARY KEY (CM_BLOCK_ID)
+  USING INDEX COMPLAIN_MST_BLOCK_PK ENABLE VALIDATE);
