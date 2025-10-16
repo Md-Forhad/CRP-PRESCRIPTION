@@ -1,0 +1,118 @@
+--Diagnosis
+ALTER TABLE DIAGNOSIS_MST_BLOCK DROP PRIMARY KEY CASCADE;
+
+DROP TABLE DIAGNOSIS_MST_BLOCK CASCADE CONSTRAINTS;
+
+CREATE TABLE DIAGNOSIS_MST_BLOCK (
+  DM_BLOCK_ID       NUMBER(10)                  NOT NULL,
+  DM_NAME           VARCHAR2(300 BYTE),
+  DM_NOTES          VARCHAR2(200 BYTE),
+  DM_IS_ACTIVE      NUMBER(2) DEFAULT 1,
+  DM_DOC_ID         NUMBER(20),
+  DM_ENTRY_BY       VARCHAR2(30),
+  DM_ENTRY_TIME     DATE DEFAULT SYSDATE
+);
+
+CREATE UNIQUE INDEX DIAGNOSIS_MST_BLOCK_PK ON DIAGNOSIS_MST_BLOCK (DM_BLOCK_ID);
+
+CREATE OR REPLACE TRIGGER DM_BLOCK_PRE_INSERT
+BEFORE INSERT ON DIAGNOSIS_MST_BLOCK
+REFERENCING OLD AS OLD NEW AS NEW
+FOR EACH ROW
+BEGIN
+    SELECT NVL(MAX(DM_BLOCK_ID),0) + 1
+    INTO :NEW.DM_BLOCK_ID
+    FROM DIAGNOSIS_MST_BLOCK;
+END;
+/
+
+-----------------------------------LOG START------------------------------------
+ALTER TABLE DIAGNOSIS_MST_BLOCK_LOG DROP PRIMARY KEY CASCADE;
+
+DROP TABLE DIAGNOSIS_MST_BLOCK_LOG CASCADE CONSTRAINTS;
+
+CREATE TABLE DIAGNOSIS_MST_BLOCK_LOG (
+  DM_BLOCK_LOG_ID   NUMBER           NOT NULL,
+  DM_BLOCK_ID       NUMBER(20),
+  DM_ID             NUMBER(10),
+  DM_BLOCK_STATUS   NUMBER(2),
+  DM_DOC_ID         NUMBER(20),
+  DM_ENTRY_BY       VARCHAR2(30),
+  DM_ENTRY_TIME     DATE,
+  DM_LOG_TIME       VARCHAR2(30),
+  DM_LOG_STATUS     VARCHAR2(10)
+);
+
+CREATE UNIQUE INDEX DIAGNOSIS_MST_BLOCK_LOG_PK ON DIAGNOSIS_MST_BLOCK_LOG (DM_BLOCK_LOG_ID);
+
+CREATE OR REPLACE TRIGGER DM_BLOCK_LOG_PRE_INS
+BEFORE INSERT ON DIAGNOSIS_MST_BLOCK_LOG
+REFERENCING OLD AS OLD NEW AS NEW
+FOR EACH ROW
+BEGIN
+    SELECT NVL(MAX(DM_BLOCK_LOG_ID),0) + 1
+    INTO :NEW.DM_BLOCK_LOG_ID
+    FROM DIAGNOSIS_MST_BLOCK_LOG;
+END;
+/
+
+ALTER TABLE DIAGNOSIS_MST_BLOCK_LOG ADD (
+  CONSTRAINT DIAGNOSIS_MST_BLOCK_LOG_PK PRIMARY KEY (DM_BLOCK_LOG_ID)
+  USING INDEX DIAGNOSIS_MST_BLOCK_LOG_PK ENABLE VALIDATE);
+---------------------------------------LOG END----------------------------------
+
+
+CREATE OR REPLACE TRIGGER DM_BLOCK_AUDIT
+BEFORE INSERT OR UPDATE OR DELETE
+ON DIAGNOSIS_MST_BLOCK
+REFERENCING OLD AS OLD NEW AS NEW
+FOR EACH ROW
+DECLARE
+    STATUS VARCHAR2(10);
+BEGIN
+    IF INSERTING OR UPDATING THEN
+        IF INSERTING THEN STATUS := 'INSERT';
+        ELSIF UPDATING THEN STATUS := 'UPDATE';
+        END IF;
+		
+        INSERT INTO DIAGNOSIS_MST_BLOCK_LOG (DM_BLOCK_ID,
+                                          DM_ID, 
+                                          DM_BLOCK_STATUS, 
+                                          DM_DOC_ID, 
+                                          DM_ENTRY_BY, 
+                                          DM_ENTRY_TIME, 
+                                          DM_LOG_TIME, 
+                                          DM_LOG_STATUS)
+        VALUES (:NEW.DM_BLOCK_ID,
+                :NEW.DM_ID, 
+                :NEW.DM_BLOCK_STATUS, 
+                :NEW.DM_DOC_ID, 
+                :NEW.DM_ENTRY_BY, 
+                :NEW.DM_ENTRY_TIME,  
+                TO_CHAR(SYSDATE,'DD/MM/RRRR HH12:MI:SS AM'),
+                STATUS);
+    ELSE
+        STATUS := 'DELETE';
+        INSERT INTO DIAGNOSIS_MST_BLOCK_LOG (DM_BLOCK_ID,
+                                          DM_ID, 
+                                          DM_BLOCK_STATUS, 
+                                          DM_DOC_ID, 
+                                          DM_ENTRY_BY, 
+                                          DM_ENTRY_TIME, 
+                                          DM_LOG_TIME, 
+                                          DM_LOG_STATUS)
+        VALUES (:OLD.DM_BLOCK_ID,
+                :OLD.DM_ID, 
+                :OLD.DM_BLOCK_STATUS, 
+                :OLD.DM_DOC_ID, 
+                :OLD.DM_ENTRY_BY, 
+                :OLD.DM_ENTRY_TIME, 
+                TO_CHAR(SYSDATE,'DD/MM/RRRR HH12:MI:SS AM'),
+                STATUS);
+    END IF;
+END;
+/
+
+ALTER TABLE DIAGNOSIS_MST_BLOCK ADD (
+  CONSTRAINT DIAGNOSIS_MST_BLOCK_PK PRIMARY KEY (DM_BLOCK_ID)
+  USING INDEX DIAGNOSIS_MST_BLOCK_PK ENABLE VALIDATE);
