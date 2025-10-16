@@ -1,0 +1,135 @@
+--Test/investigation/service/device
+ALTER TABLE PAYMENT_FEE_NAME_BLOCK DROP PRIMARY KEY CASCADE;
+
+DROP TABLE PAYMENT_FEE_NAME_BLOCK CASCADE CONSTRAINTS;
+
+CREATE TABLE PAYMENT_FEE_NAME_BLOCK (
+  PFN_BLOCK_ID             NUMBER(20)           NOT NULL,
+  PFN_ID                   NUMBER(10),
+  PFN_BLOCK_STATUS         NUMBER(2),
+  PFN_ENTRY_BY             VARCHAR2(20),
+  PFN_ENTRY_TIME           VARCHAR2(30),
+  PFN_UPDATE_BY            VARCHAR2(20),
+  PFN_UPDATE_TIME          VARCHAR2(30),
+  PFN_CID_ID               NUMBER(10),
+  PFN_DOC_ID               NUMBER(20)
+);
+
+CREATE UNIQUE INDEX PAYMENT_FEE_NAME_BLOCK_PK ON PAYMENT_FEE_NAME_BLOCK (PFN_BLOCK_ID);
+
+CREATE OR REPLACE TRIGGER PFN_BLOCK_PRE_INSERT
+BEFORE INSERT ON PAYMENT_FEE_NAME_BLOCK
+REFERENCING OLD AS OLD NEW AS NEW
+FOR EACH ROW
+BEGIN
+    SELECT NVL(MAX(PFN_BLOCK_ID),0) + 1
+    INTO :NEW.PFN_BLOCK_ID
+    FROM PAYMENT_FEE_NAME_BLOCK;
+END;
+/
+
+-----------------------------------LOG START------------------------------------
+ALTER TABLE PAYMENT_FEE_NAME_BLOCK_LOG DROP PRIMARY KEY CASCADE;
+
+DROP TABLE PAYMENT_FEE_NAME_BLOCK_LOG CASCADE CONSTRAINTS;
+
+CREATE TABLE PAYMENT_FEE_NAME_BLOCK_LOG (
+  PFN_BLOCK_LOG_ID         NUMBER,
+  PFN_BLOCK_ID             NUMBER(20),
+  PFN_ID                   NUMBER(10),
+  PFN_BLOCK_STATUS         NUMBER(2),
+  PFN_ENTRY_BY             VARCHAR2(20),
+  PFN_ENTRY_TIME           VARCHAR2(30),
+  PFN_UPDATE_BY            VARCHAR2(20),
+  PFN_UPDATE_TIME          VARCHAR2(30),
+  PFN_LOG_TIME             VARCHAR2(30),
+  PFN_LOG_STATUS           VARCHAR2(10),
+  PFN_CID_ID               NUMBER(10),
+  PFN_DOC_ID               NUMBER(20)
+);
+
+CREATE UNIQUE INDEX PAYMENT_FEE_NAME_BLOCK_LOG_PK ON PAYMENT_FEE_NAME_BLOCK_LOG (PFN_BLOCK_LOG_ID);
+
+CREATE OR REPLACE TRIGGER PFN_BLOCK_LOG_PRE_INSERT
+BEFORE INSERT ON PAYMENT_FEE_NAME_BLOCK_LOG
+REFERENCING OLD AS OLD NEW AS NEW
+FOR EACH ROW
+BEGIN
+    SELECT NVL(MAX(PFN_BLOCK_LOG_ID),0) + 1
+    INTO :NEW.PFN_BLOCK_LOG_ID
+    FROM PAYMENT_FEE_NAME_BLOCK_LOG;
+END;
+/
+
+ALTER TABLE PAYMENT_FEE_NAME_BLOCK_LOG ADD (
+  CONSTRAINT PAYMENT_FEE_NAME_BLOCK_LOG_PK PRIMARY KEY (PFN_BLOCK_LOG_ID)
+  USING INDEX PAYMENT_FEE_NAME_BLOCK_LOG_PK ENABLE VALIDATE);
+---------------------------------------LOG END----------------------------------
+
+
+CREATE OR REPLACE TRIGGER PFN_BLOCK_PRE_INSERT
+BEFORE INSERT OR UPDATE OR DELETE
+ON PAYMENT_FEE_NAME_BLOCK
+REFERENCING OLD AS OLD NEW AS NEW
+FOR EACH ROW
+DECLARE
+    STATUS VARCHAR2(10);
+BEGIN
+    IF INSERTING OR UPDATING THEN
+        IF INSERTING THEN STATUS := 'INSERT';
+        ELSIF UPDATING THEN STATUS := 'UPDATE';
+        END IF;
+		
+        INSERT INTO PAYMENT_FEE_NAME_BLOCK_LOG (PFN_BLOCK_ID,
+                                          PFN_ID, 
+                                          PFN_BLOCK_STATUS, 
+                                          PFN_ENTRY_BY, 
+                                          PFN_ENTRY_TIME, 
+                                          PFN_UPDATE_BY, 
+                                          PFN_UPDATE_TIME, 
+                                          PFN_LOG_TIME, 
+                                          PFN_LOG_STATUS,
+                                          PFN_CID_ID,
+                                          PFN_DOC_ID)
+        VALUES (:NEW.PFN_BLOCK_ID,
+                :NEW.PFN_ID, 
+                :NEW.PFN_BLOCK_STATUS, 
+                :NEW.PFN_ENTRY_BY, 
+                :NEW.PFN_ENTRY_TIME, 
+                :NEW.PFN_UPDATE_BY, 
+                :NEW.PFN_UPDATE_TIME, 
+                TO_CHAR(SYSDATE,'DD/MM/RRRR HH12:MI:SS AM'),
+                STATUS, 
+                :NEW.PFN_CID_ID,
+                :NEW.PFN_DOC_ID);
+    ELSE
+        STATUS := 'DELETE';
+        INSERT INTO PAYMENT_FEE_NAME_BLOCK_LOG (PFN_BLOCK_ID,
+                                          PFN_ID, 
+                                          PFN_BLOCK_STATUS, 
+                                          PFN_ENTRY_BY, 
+                                          PFN_ENTRY_TIME, 
+                                          PFN_UPDATE_BY, 
+                                          PFN_UPDATE_TIME, 
+                                          PFN_LOG_TIME, 
+                                          PFN_LOG_STATUS,
+                                          PFN_CID_ID,
+                                          PFN_DOC_ID)
+        VALUES (:OLD.PFN_BLOCK_ID,
+                :OLD.PFN_ID, 
+                :OLD.PFN_BLOCK_STATUS, 
+                :OLD.PFN_ENTRY_BY, 
+                :OLD.PFN_ENTRY_TIME, 
+                :OLD.PFN_UPDATE_BY, 
+                :OLD.PFN_UPDATE_TIME, 
+                TO_CHAR(SYSDATE,'DD/MM/RRRR HH12:MI:SS AM'),
+                STATUS, 
+                :OLD.PFN_CID_ID,
+                :OLD.PFN_DOC_ID);
+    END IF;
+END;
+/
+
+ALTER TABLE PAYMENT_FEE_NAME_BLOCK ADD (
+  CONSTRAINT PAYMENT_FEE_NAME_BLOCK_PK PRIMARY KEY (PFN_BLOCK_ID)
+  USING INDEX PAYMENT_FEE_NAME_BLOCK_PK ENABLE VALIDATE);
