@@ -4,23 +4,22 @@ ALTER TABLE MEDICAL_HISTORY_MST_BLOCK DROP PRIMARY KEY CASCADE;
 DROP TABLE MEDICAL_HISTORY_MST_BLOCK CASCADE CONSTRAINTS;
 
 CREATE TABLE MEDICAL_HISTORY_MST_BLOCK (
-  MHM_BLOCK_ID          NUMBER(20)                  NOT NULL,
-  MHM_ID                NUMBER(10),
-  MHM_BLOCK_STATUS      NUMBER(2) DEFAULT 1,
-  MHM_DOC_ID            NUMBER(20),
-  MHM_ENTRY_BY          VARCHAR2(30),
-  MHM_ENTRY_TIME        DATE DEFAULT SYSDATE
+  MHMB_ID                NUMBER(20)                  NOT NULL,
+  MHMB_MHM_ID            NUMBER(10),
+  MHMB_DOC_ID            NUMBER(20),
+  MHMB_ENTRY_BY          VARCHAR2(30),
+  MHMB_ENTRY_TIME        DATE DEFAULT SYSDATE
 );
 
-CREATE UNIQUE INDEX MEDICAL_HISTORY_MST_BLOCK_PK ON MEDICAL_HISTORY_MST_BLOCK (MHM_ID);
+CREATE UNIQUE INDEX MEDICAL_HISTORY_MST_BLOCK_PK ON MEDICAL_HISTORY_MST_BLOCK (MHMB_ID);
 
 CREATE OR REPLACE TRIGGER MHM_BLOCK_PRE_INSERT
 BEFORE INSERT ON MEDICAL_HISTORY_MST_BLOCK
 REFERENCING OLD AS OLD NEW AS NEW
 FOR EACH ROW
 BEGIN
-    SELECT NVL(MAX(MHM_BLOCK_ID),0) + 1
-    INTO :NEW.MHM_BLOCK_ID
+    SELECT NVL(MAX(MHMB_ID),0) + 1
+    INTO :NEW.MHMB_ID
     FROM MEDICAL_HISTORY_MST_BLOCK;
 END;
 /
@@ -31,32 +30,31 @@ ALTER TABLE MEDICAL_HISTORY_BLOCK_LOG DROP PRIMARY KEY CASCADE;
 DROP TABLE MEDICAL_HISTORY_BLOCK_LOG CASCADE CONSTRAINTS;
 
 CREATE TABLE MEDICAL_HISTORY_BLOCK_LOG (
-  MHM_BLOCK_LOG_ID   NUMBER           NOT NULL,
-  MHM_BLOCK_ID       NUMBER(20),
-  MHM_ID             NUMBER(10),
-  MHM_BLOCK_STATUS   NUMBER(2),
-  MHM_DOC_ID         NUMBER(20),
-  MHM_ENTRY_BY       VARCHAR2(30),
-  MHM_ENTRY_TIME     DATE,
-  MHM_LOG_TIME       VARCHAR2(30),
-  MHM_LOG_STATUS     VARCHAR2(10)
+  MHMB_LOG_ID         NUMBER           NOT NULL,
+  MHMB_ID             NUMBER(20),
+  MHMB_MHM_ID         NUMBER(10),
+  MHMB_DOC_ID         NUMBER(20),
+  MHMB_ENTRY_BY       VARCHAR2(30),
+  MHMB_ENTRY_TIME     DATE,
+  MHMB_LOG_TIME       VARCHAR2(30),
+  MHMB_LOG_STATUS     VARCHAR2(10)
 );
 
-CREATE UNIQUE INDEX MEDICAL_HISTORY_BLOCK_LOG_PK ON MEDICAL_HISTORY_BLOCK_LOG (MHM_BLOCK_LOG_ID);
+CREATE UNIQUE INDEX MEDICAL_HISTORY_BLOCK_LOG_PK ON MEDICAL_HISTORY_BLOCK_LOG (MHMB_LOG_ID);
 
 CREATE OR REPLACE TRIGGER MHM_BLOCK_AUDIT
 BEFORE INSERT ON MEDICAL_HISTORY_BLOCK_LOG
 REFERENCING OLD AS OLD NEW AS NEW
 FOR EACH ROW
 BEGIN
-    SELECT NVL(MAX(MHM_BLOCK_LOG_ID),0) + 1
-    INTO :NEW.MHM_BLOCK_LOG_ID
+    SELECT NVL(MAX(MHMB_LOG_ID),0) + 1
+    INTO :NEW.MHMB_LOG_ID
     FROM MEDICAL_HISTORY_BLOCK_LOG;
 END;
 /
 
 ALTER TABLE MEDICAL_HISTORY_BLOCK_LOG ADD (
-  CONSTRAINT MEDICAL_HISTORY_BLOCK_LOG_PK PRIMARY KEY (MHM_BLOCK_LOG_ID)
+  CONSTRAINT MEDICAL_HISTORY_BLOCK_LOG_PK PRIMARY KEY (MHMB_LOG_ID)
   USING INDEX MEDICAL_HISTORY_BLOCK_LOG_PK ENABLE VALIDATE);
 ---------------------------------------LOG END----------------------------------
 
@@ -74,38 +72,34 @@ BEGIN
         ELSIF UPDATING THEN STATUS := 'UPDATE';
         END IF;
 		
-        INSERT INTO MEDICAL_HISTORY_BLOCK_LOG (MHM_BLOCK_ID,
-                                          MHM_ID, 
-                                          MHM_BLOCK_STATUS, 
-                                          MHM_DOC_ID, 
-                                          MHM_ENTRY_BY, 
-                                          MHM_ENTRY_TIME, 
-                                          MHM_LOG_TIME, 
-                                          MHM_LOG_STATUS)
-        VALUES (:NEW.MHM_BLOCK_ID,
-                :NEW.MHM_ID, 
-                :NEW.MHM_BLOCK_STATUS, 
-                :NEW.MHM_DOC_ID, 
-                :NEW.MHM_ENTRY_BY, 
-                :NEW.MHM_ENTRY_TIME,  
+        INSERT INTO MEDICAL_HISTORY_BLOCK_LOG (MHMB_ID, 
+                                          MHMB_MHM_ID, 
+                                          MHMB_DOC_ID, 
+                                          MHMB_ENTRY_BY, 
+                                          MHMB_ENTRY_TIME, 
+                                          MHMB_LOG_TIME, 
+                                          MHMB_LOG_STATUS)
+        VALUES (:NEW.MHMB_ID, 
+                :NEW.MHMB_MHM_ID, 
+                :NEW.MHMB_DOC_ID, 
+                :NEW.MHMB_ENTRY_BY, 
+                :NEW.MHMB_ENTRY_TIME, 
                 TO_CHAR(SYSDATE,'DD/MM/RRRR HH12:MI:SS AM'),
                 STATUS);
     ELSE
         STATUS := 'DELETE';
-        INSERT INTO MEDICAL_HISTORY_BLOCK_LOG (MHM_BLOCK_ID,
-                                          MHM_ID, 
-                                          MHM_BLOCK_STATUS, 
-                                          MHM_DOC_ID, 
-                                          MHM_ENTRY_BY, 
-                                          MHM_ENTRY_TIME, 
-                                          MHM_LOG_TIME, 
-                                          MHM_LOG_STATUS)
-        VALUES (:OLD.MHM_BLOCK_ID,
-                :OLD.MHM_ID, 
-                :OLD.MHM_BLOCK_STATUS, 
-                :OLD.MHM_DOC_ID, 
-                :OLD.MHM_ENTRY_BY, 
-                :OLD.MHM_ENTRY_TIME, 
+        INSERT INTO MEDICAL_HISTORY_BLOCK_LOG (MHMB_ID,
+                                          MHMB_MHM_ID, 
+                                          MHMB_DOC_ID, 
+                                          MHMB_ENTRY_BY, 
+                                          MHMB_ENTRY_TIME, 
+                                          MHMB_LOG_TIME, 
+                                          MHMB_LOG_STATUS)
+        VALUES (:OLD.MHMB_ID,
+                :OLD.MHMB_MHM_ID, 
+                :OLD.MHMB_DOC_ID, 
+                :OLD.MHMB_ENTRY_BY, 
+                :OLD.MHMB_ENTRY_TIME, 
                 TO_CHAR(SYSDATE,'DD/MM/RRRR HH12:MI:SS AM'),
                 STATUS);
     END IF;
@@ -113,5 +107,5 @@ END;
 /
 
 ALTER TABLE MEDICAL_HISTORY_MST_BLOCK ADD (
-  CONSTRAINT MEDICAL_HISTORY_MST_BLOCK_PK PRIMARY KEY (MHM_BLOCK_ID)
+  CONSTRAINT MEDICAL_HISTORY_MST_BLOCK_PK PRIMARY KEY (MHMB_ID)
   USING INDEX MEDICAL_HISTORY_MST_BLOCK_PK ENABLE VALIDATE);
