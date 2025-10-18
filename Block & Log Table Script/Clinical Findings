@@ -7,6 +7,7 @@ CREATE TABLE CLINICAL_FINDINGS_MST_BLOCK (
   CFMB_ID                NUMBER(20)                  NOT NULL,
   CFMB_CFM_ID            NUMBER(10),
   CFMB_DOC_ID            NUMBER(20),
+  CFMB_CID_ID            NUMBER(10),
   CFMB_ENTRY_BY          VARCHAR2(30),
   CFMB_ENTRY_TIME        DATE DEFAULT SYSDATE
 );
@@ -30,14 +31,15 @@ ALTER TABLE CLINICAL_FINDINGS_BLOCK_LOG DROP PRIMARY KEY CASCADE;
 DROP TABLE CLINICAL_FINDINGS_BLOCK_LOG CASCADE CONSTRAINTS;
 
 CREATE TABLE CLINICAL_FINDINGS_BLOCK_LOG (
-  CFMB_LOG_ID         NUMBER           NOT NULL,
-  CFMB_ID             NUMBER(20),
-  CFMB_CFM_ID         NUMBER(10),
-  CFMB_DOC_ID         NUMBER(20),
-  CFMB_ENTRY_BY       VARCHAR2(30),
-  CFMB_ENTRY_TIME     DATE,
-  CFMB_LOG_TIME       VARCHAR2(30),
-  CFMB_LOG_STATUS     VARCHAR2(10)
+  CFMB_LOG_ID            NUMBER           NOT NULL,
+  CFMB_ID                NUMBER(20),
+  CFMB_CFM_ID            NUMBER(10),
+  CFMB_DOC_ID            NUMBER(20),
+  CFMB_CID_ID            NUMBER(10),
+  CFMB_ENTRY_BY          VARCHAR2(30),
+  CFMB_ENTRY_TIME        DATE,
+  CFMB_LOG_TIME          VARCHAR2(30),
+  CFMB_LOG_STATUS        VARCHAR2(10)
 );
 
 CREATE UNIQUE INDEX CLINICAL_FINDINGS_BLOCK_LOG_PK ON CLINICAL_FINDINGS_BLOCK_LOG (CFMB_LOG_ID);
@@ -75,6 +77,7 @@ BEGIN
         INSERT INTO CLINICAL_FINDINGS_BLOCK_LOG (CFMB_ID, 
                                           CFMB_CFM_ID, 
                                           CFMB_DOC_ID, 
+                                          CFMB_CID_ID, 
                                           CFMB_ENTRY_BY, 
                                           CFMB_ENTRY_TIME, 
                                           CFMB_LOG_TIME, 
@@ -82,6 +85,7 @@ BEGIN
         VALUES (:NEW.CFMB_ID,
                 :NEW.CFMB_CFM_ID, 
                 :NEW.CFMB_DOC_ID, 
+                :NEW.CFMB_CID_ID, 
                 :NEW.CFMB_ENTRY_BY, 
                 :NEW.CFMB_ENTRY_TIME,  
                 TO_CHAR(SYSDATE,'DD/MM/RRRR HH12:MI:SS AM'),
@@ -91,6 +95,7 @@ BEGIN
         INSERT INTO CLINICAL_FINDINGS_BLOCK_LOG (CFMB_ID,
                                           CFMB_CFM_ID, 
                                           CFMB_DOC_ID, 
+                                          CFMB_CID_ID, 
                                           CFMB_ENTRY_BY, 
                                           CFMB_ENTRY_TIME, 
                                           CFMB_LOG_TIME, 
@@ -98,6 +103,7 @@ BEGIN
         VALUES (:OLD.CFMB_ID,
                 :OLD.CFMB_CFM_ID, 
                 :OLD.CFMB_DOC_ID, 
+                :OLD.CFMB_CID_ID, 
                 :OLD.CFMB_ENTRY_BY, 
                 :OLD.CFMB_ENTRY_TIME, 
                 TO_CHAR(SYSDATE,'DD/MM/RRRR HH12:MI:SS AM'),
