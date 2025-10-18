@@ -6,7 +6,6 @@ DROP TABLE INJURY_MST_BLOCK CASCADE CONSTRAINTS;
 CREATE TABLE INJURY_MST_BLOCK (
   INJURY_BLOCK_ID           NUMBER(20)              NOT NULL,
   INJURY_ID                 NUMBER(10),
-  INJURY_BLOCK_STATUS       NUMBER(2) DEFAULT 1,
   INJURY_DOC_ID             NUMBER(20),
   INJURY_ENTRY_BY           VARCHAR2(30),
   INJURY_ENTRY_TIME         DATE DEFAULT SYSDATE
@@ -34,7 +33,6 @@ CREATE TABLE INJURY_MST_BLOCK_LOG (
   INJURY_BLOCK_LOG_ID   NUMBER           NOT NULL,
   INJURY_BLOCK_ID       NUMBER(20),
   INJURY_ID             NUMBER(10),
-  INJURY_BLOCK_STATUS   NUMBER(2),
   INJURY_DOC_ID         NUMBER(20),
   INJURY_ENTRY_BY       VARCHAR2(30),
   INJURY_ENTRY_TIME     DATE,
@@ -74,39 +72,35 @@ BEGIN
         ELSIF UPDATING THEN STATUS := 'UPDATE';
         END IF;
 		
-        INSERT INTO INJURY_MST_BLOCK_LOG (INJURY_BLOCK_ID,
+        INSERT INTO INJURY_MST_BLOCK_LOG (INJURY_BLOCK_ID, 
                                           INJURY_ID, 
-                                          INJURY_BLOCK_STATUS, 
                                           INJURY_DOC_ID, 
                                           INJURY_ENTRY_BY, 
                                           INJURY_ENTRY_TIME, 
                                           INJURY_LOG_TIME, 
                                           INJURY_LOG_STATUS)
-        VALUES (:NEW.INJURY_BLOCK_ID,
+        VALUES (:NEW.INJURY_BLOCK_ID, 
                 :NEW.INJURY_ID, 
-                :NEW.INJURY_BLOCK_STATUS, 
                 :NEW.INJURY_DOC_ID, 
                 :NEW.INJURY_ENTRY_BY, 
-                :NEW.INJURY_ENTRY_TIME,  
+                :NEW.INJURY_ENTRY_TIME, 
                 TO_CHAR(SYSDATE,'DD/MM/RRRR HH12:MI:SS AM'),
                 STATUS);
     ELSE
         STATUS := 'DELETE';
-        INSERT INTO INJURY_MST_BLOCK_LOG (INJURY_BLOCK_ID,
+        INSERT INTO INJURY_MST_BLOCK_LOG (INJURY_BLOCK_ID, 
                                           INJURY_ID, 
-                                          INJURY_BLOCK_STATUS, 
                                           INJURY_DOC_ID, 
                                           INJURY_ENTRY_BY, 
                                           INJURY_ENTRY_TIME, 
                                           INJURY_LOG_TIME, 
                                           INJURY_LOG_STATUS)
-        VALUES (:OLD.INJURY_BLOCK_ID,
+        VALUES (:OLD.INJURY_BLOCK_ID, 
                 :OLD.INJURY_ID, 
-                :OLD.INJURY_BLOCK_STATUS, 
                 :OLD.INJURY_DOC_ID, 
                 :OLD.INJURY_ENTRY_BY, 
                 :OLD.INJURY_ENTRY_TIME, 
-                TO_CHAR(SYSDATE,'DD/MM/RRRR HH12:MI:SS AM'),
+                TO_CHAR(SYSDATE,'DD/MM/RRRR HH12:MI:SS AM'), 
                 STATUS);
     END IF;
 END;
