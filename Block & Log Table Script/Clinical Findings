@@ -4,23 +4,22 @@ ALTER TABLE CLINICAL_FINDINGS_MST_BLOCK DROP PRIMARY KEY CASCADE;
 DROP TABLE CLINICAL_FINDINGS_MST_BLOCK CASCADE CONSTRAINTS;
 
 CREATE TABLE CLINICAL_FINDINGS_MST_BLOCK (
-  CFM_BLOCK_ID          NUMBER(20)                  NOT NULL,
-  CFM_ID                NUMBER(10),
-  CFM_BLOCK_STATUS      NUMBER(2) DEFAULT 1,
-  CFM_DOC_ID            NUMBER(20),
-  CFM_ENTRY_BY          VARCHAR2(30),
-  CFM_ENTRY_TIME        DATE DEFAULT SYSDATE
+  CFMB_ID                NUMBER(20)                  NOT NULL,
+  CFMB_CFM_ID            NUMBER(10),
+  CFMB_DOC_ID            NUMBER(20),
+  CFMB_ENTRY_BY          VARCHAR2(30),
+  CFMB_ENTRY_TIME        DATE DEFAULT SYSDATE
 );
 
-CREATE UNIQUE INDEX CLINICAL_FINDINGS_MST_BLK_PK ON CLINICAL_FINDINGS_MST_BLOCK (CFM_BLOCK_ID);
+CREATE UNIQUE INDEX CLINICAL_FINDINGS_MST_BLK_PK ON CLINICAL_FINDINGS_MST_BLOCK (CFMB_ID);
 
 CREATE OR REPLACE TRIGGER CFM_BLOCK_PRE_INSERT
 BEFORE INSERT ON CLINICAL_FINDINGS_MST_BLOCK
 REFERENCING OLD AS OLD NEW AS NEW
 FOR EACH ROW
 BEGIN
-    SELECT NVL(MAX(CFM_BLOCK_ID),0) + 1
-    INTO :NEW.CFM_BLOCK_ID
+    SELECT NVL(MAX(CFMB_ID),0) + 1
+    INTO :NEW.CFMB_ID
     FROM CLINICAL_FINDINGS_MST_BLOCK;
 END;
 /
@@ -31,32 +30,31 @@ ALTER TABLE CLINICAL_FINDINGS_BLOCK_LOG DROP PRIMARY KEY CASCADE;
 DROP TABLE CLINICAL_FINDINGS_BLOCK_LOG CASCADE CONSTRAINTS;
 
 CREATE TABLE CLINICAL_FINDINGS_BLOCK_LOG (
-  CFM_BLOCK_LOG_ID   NUMBER           NOT NULL,
-  CFM_BLOCK_ID       NUMBER(20),
-  CFM_ID             NUMBER(10),
-  CFM_BLOCK_STATUS   NUMBER(2),
-  CFM_DOC_ID         NUMBER(20),
-  CFM_ENTRY_BY       VARCHAR2(30),
-  CFM_ENTRY_TIME     DATE,
-  CFM_LOG_TIME       VARCHAR2(30),
-  CFM_LOG_STATUS     VARCHAR2(10)
+  CFMB_LOG_ID         NUMBER           NOT NULL,
+  CFMB_ID             NUMBER(20),
+  CFMB_CFM_ID         NUMBER(10),
+  CFMB_DOC_ID         NUMBER(20),
+  CFMB_ENTRY_BY       VARCHAR2(30),
+  CFMB_ENTRY_TIME     DATE,
+  CFMB_LOG_TIME       VARCHAR2(30),
+  CFMB_LOG_STATUS     VARCHAR2(10)
 );
 
-CREATE UNIQUE INDEX CLINICAL_FINDINGS_BLOCK_LOG_PK ON CLINICAL_FINDINGS_BLOCK_LOG (CFM_BLOCK_LOG_ID);
+CREATE UNIQUE INDEX CLINICAL_FINDINGS_BLOCK_LOG_PK ON CLINICAL_FINDINGS_BLOCK_LOG (CFMB_LOG_ID);
 
 CREATE OR REPLACE TRIGGER CFM_BLOCK_LOG_PRE_INS
 BEFORE INSERT ON CLINICAL_FINDINGS_BLOCK_LOG
 REFERENCING OLD AS OLD NEW AS NEW
 FOR EACH ROW
 BEGIN
-    SELECT NVL(MAX(CFM_BLOCK_LOG_ID),0) + 1
-    INTO :NEW.CFM_BLOCK_LOG_ID
+    SELECT NVL(MAX(CFMB_LOG_ID),0) + 1
+    INTO :NEW.CFMB_LOG_ID
     FROM CLINICAL_FINDINGS_BLOCK_LOG;
 END;
 /
 
 ALTER TABLE CLINICAL_FINDINGS_BLOCK_LOG ADD (
-  CONSTRAINT CLINICAL_FINDINGS_BLOCK_LOG_PK PRIMARY KEY (CFM_BLOCK_LOG_ID)
+  CONSTRAINT CLINICAL_FINDINGS_BLOCK_LOG_PK PRIMARY KEY (CFMB_LOG_ID)
   USING INDEX CLINICAL_FINDINGS_BLOCK_LOG_PK ENABLE VALIDATE);
 ---------------------------------------LOG END----------------------------------
 
@@ -74,38 +72,34 @@ BEGIN
         ELSIF UPDATING THEN STATUS := 'UPDATE';
         END IF;
 		
-        INSERT INTO CLINICAL_FINDINGS_BLOCK_LOG (CFM_BLOCK_ID,
-                                          CFM_ID, 
-                                          CFM_BLOCK_STATUS, 
-                                          CFM_DOC_ID, 
-                                          CFM_ENTRY_BY, 
-                                          CFM_ENTRY_TIME, 
-                                          CFM_LOG_TIME, 
-                                          CFM_LOG_STATUS)
-        VALUES (:NEW.CFM_BLOCK_ID,
-                :NEW.CFM_ID, 
-                :NEW.CFM_BLOCK_STATUS, 
-                :NEW.CFM_DOC_ID, 
-                :NEW.CFM_ENTRY_BY, 
-                :NEW.CFM_ENTRY_TIME,  
+        INSERT INTO CLINICAL_FINDINGS_BLOCK_LOG (CFMB_ID, 
+                                          CFMB_CFM_ID, 
+                                          CFMB_DOC_ID, 
+                                          CFMB_ENTRY_BY, 
+                                          CFMB_ENTRY_TIME, 
+                                          CFMB_LOG_TIME, 
+                                          CFMB_LOG_STATUS)
+        VALUES (:NEW.CFMB_ID,
+                :NEW.CFMB_CFM_ID, 
+                :NEW.CFMB_DOC_ID, 
+                :NEW.CFMB_ENTRY_BY, 
+                :NEW.CFMB_ENTRY_TIME,  
                 TO_CHAR(SYSDATE,'DD/MM/RRRR HH12:MI:SS AM'),
                 STATUS);
     ELSE
         STATUS := 'DELETE';
-        INSERT INTO CLINICAL_FINDINGS_BLOCK_LOG (CFM_BLOCK_ID,
-                                          CFM_ID, 
-                                          CFM_BLOCK_STATUS, 
-                                          CFM_DOC_ID, 
-                                          CFM_ENTRY_BY, 
-                                          CFM_ENTRY_TIME, 
-                                          CFM_LOG_TIME, 
-                                          CFM_LOG_STATUS)
-        VALUES (:OLD.CFM_BLOCK_ID,
-                :OLD.CFM_ID, 
-                :OLD.CFM_BLOCK_STATUS, 
-                :OLD.CFM_DOC_ID, 
-                :OLD.CFM_ENTRY_BY, 
-                :OLD.CFM_ENTRY_TIME, 
+        INSERT INTO CLINICAL_FINDINGS_BLOCK_LOG (CFMB_ID,
+                                          CFMB_CFM_ID, 
+                                          CFMB_DOC_ID, 
+                                          CFMB_ENTRY_BY, 
+                                          CFMB_ENTRY_TIME, 
+                                          CFMB_LOG_TIME, 
+                                          CFMB_LOG_STATUS)
+        VALUES (:OLD.CFMB_ID,
+                :OLD.CFMB_CFM_ID, 
+                :OLD.CFMB_DOC_ID, 
+                :OLD.CFMB_ENTRY_BY, 
+                :OLD.CFMB_ENTRY_TIME, 
                 TO_CHAR(SYSDATE,'DD/MM/RRRR HH12:MI:SS AM'),
                 STATUS);
     END IF;
@@ -113,5 +107,5 @@ END;
 /
 
 ALTER TABLE CLINICAL_FINDINGS_MST_BLOCK ADD (
-  CONSTRAINT CLINICAL_FINDINGS_MST_BLK_PK PRIMARY KEY (CFM_BLOCK_ID)
+  CONSTRAINT CLINICAL_FINDINGS_MST_BLK_PK PRIMARY KEY (CFMB_ID)
   USING INDEX CLINICAL_FINDINGS_MST_BLK_PK ENABLE VALIDATE);
